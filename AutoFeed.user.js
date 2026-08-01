@@ -1,18 +1,204 @@
 // ==UserScript==
 // @name         X.com Auto-Feed
 // @namespace    http://tampermonkey.net/
-// @version      4.8
+// @version      4.9
 // @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive, virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
 // @author       Esrevorter
-// @match        https://x.com/home
-// @match        https://x.com/i/lists/*
-// @match        https://twitter.com/i/lists/*
-// @match        https://x.com/*/lists/*
-// @match        https://twitter.com/*/lists/*
+// @match        https://x.com/*
+// @match        https://twitter.com/*
+// @match        https://mobile.twitter.com/*
+// @match        https://mobile.x.com/*
+// @updateURL    https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
+// @downloadURL  https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
+// @supportURL   https://github.com/Esrevorter/AutoFeed/issues
 // @grant        GM_addStyle
 // @run-at       document-idle
 // @inject-into  content
 // ==/UserScript==
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * ⚡ X.COM AUTO-FEED v4.9
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * 📖 DESCRIPTION
+ * ───────────────────────────────────────────────────────────────────────────────
+ * An advanced Tampermonkey userscript that automates engagement actions (Likes,
+ * Retweets, Bookmarks) on X.com (Twitter). Designed with safety and human-like
+ * behavior patterns to minimize detection risk while providing powerful automation.
+ *
+ * 🔥 KEY FEATURES
+ * ───────────────────────────────────────────────────────────────────────────────
+ * • VERIFIED ACTIONS     - Only interacts with tweets that haven't been processed
+ * • RANDOMIZED VOLUME    - Each session processes a random number of tweets within
+ *                          your configured range (no two sessions are identical)
+ * • CONSECUTIVE-FAILURE  - Detects when actions aren't registering (rate limits,
+ *   THROTTLE DETECTION     privacy blockers) and pauses automatically
+ * • DIRECTION-AWARE      - Scroll top→down for feeds/lists or bottom→up for
+ *   PROGRESSIVE SCROLL     backlog/For-You feeds
+ * • FOLDED CONFIG UI     - Collapsible sections keep the interface compact
+ * • PINNED CONTROLS      - Floating, draggable panel stays accessible
+ * • BACKGROUND TAB       - Silent audio keep-alive defeats browser timer throttling
+ *   KEEP-ALIVE             when tab is hidden; optional audible ping mode
+ * • VIRTUALIZATION-PROOF - Robust tweet ID deduplication survives DOM recycling
+ * • END-OF-FEED          - Detects when X has no more content to load
+ *   DETECTION
+ * • PRIVACY-BLOCKER      - Warns when extensions break X's functionality
+ *   DETECTION
+ * • ADVANCED HUMAN-LIKE  - Dynamic "attention drift" randomly skips tweets with
+ *   RANDOMIZER             adjustable probability, mimicking natural browsing
+ * • ANIMATED UI FEEDBACK - Smooth animations, breathing status indicators, and
+ *                          action chip bursts provide visual confirmation
+ * • CSP-PROOF            - Works even with strict Content Security Policies
+ *
+ *
+ * 📦 INSTALLATION
+ * ───────────────────────────────────────────────────────────────────────────────
+ * 1. Install a userscript manager:
+ *    • Tampermonkey: https://www.tampermonkey.net/
+ *    • Violentmonkey: https://violentmonkey.github.io/
+ *    • Greasemonkey: https://www.greasespot.net/
+ *
+ * 2. Click this link to install automatically:
+ *    https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
+ *
+ * 3. Or manually:
+ *    a. Open your userscript manager dashboard
+ *    b. Create a new script
+ *    c. Copy/paste the entire script content
+ *    d. Save and enable
+ *
+ * 4. Navigate to X.com (or Twitter.com) — the control panel will appear
+ *
+ *
+ * 🔄 UPDATES
+ * ───────────────────────────────────────────────────────────────────────────────
+ * Automatic updates are enabled via @updateURL. Your userscript manager will
+ * check for new versions periodically. You can also manually check:
+ *    https://github.com/Esrevorter/AutoFeed
+ *
+ *
+ * 🎮 USAGE
+ * ───────────────────────────────────────────────────────────────────────────────
+ * 1. Navigate to your desired feed:
+ *    • Home Feed: https://x.com/home
+ *    • Lists: https://x.com/i/lists/[LIST_ID]
+ *    • Profile Lists: https://x.com/[USERNAME]/lists
+ *
+ * 2. Configure your preferences in the floating panel:
+ *    • Actions Fold: Select Like, Retweet, Bookmark; toggle random combos
+ *    • Session Volume: Set min/max tweet range for randomized targets
+ *    • Direction: Choose scroll direction based on feed type
+ *    • Background Tab: Enable silent/audible keep-alive for background use
+ *    • Delays: Set min/max delay between actions (milliseconds)
+ *
+ * 3. Press START to begin automation
+ *    • Panel shows real-time progress and action counters
+ *    • Log displays timestamped activity
+ *    • Animated chips pulse on each successful action
+ *
+ * 4. PAUSE anytime; RESUME after addressing warnings (rate limits, etc.)
+ *
+ * 5. When finished (target reached or end of feed), press RESTART for new session
+ *
+ *
+ * ⚙️ CONFIGURATION OPTIONS
+ * ───────────────────────────────────────────────────────────────────────────────
+ * Actions Fold:
+ *   ❤️ Likes           - Automatically like tweets
+ *   🔁 Retweets        - Automatically retweet (with confirmation click)
+ *   🔖 Bookmarks       - Automatically bookmark tweets
+ *   🎲 Random Combo    - Perform random subset of enabled actions per tweet
+ *   🔀 Randomizer      - Shuffle tweet order + dynamic attention drift
+ *
+ * Session Volume:
+ *   Min Tweets         - Lower bound for random session target (default: 50)
+ *   Max Tweets         - Upper bound for random session target (default: 200)
+ *   → Each session rolls a random target within this range
+ *
+ * Scroll Direction:
+ *   ⬇️ Top→Down        - Start from newest tweets (ideal for Feeds/Lists)
+ *   ⬆️ Bottom→Up       - Start from oldest visible tweets (For-You/backlog)
+ *
+ * Background Tab:
+ *   🔇 Silent Keep-Alive  - Uses inaudible audio to prevent timer throttling
+ *   🔊 Audible Ping       - Faint blips every 6 seconds when tab is hidden
+ *
+ * Delays:
+ *   Min Delay (ms)     - Minimum wait between actions (default: 4000ms)
+ *   Max Delay (ms)     - Maximum wait between actions (default: 9000ms)
+ *   → Actual delay is randomized within this range for human-like behavior
+ *
+ *
+ * 🛡️ SAFETY & BEST PRACTICES
+ * ───────────────────────────────────────────────────────────────────────────────
+ * • Use conservative delays (4000–9000ms recommended)
+ * • Set reasonable session volumes (50–200 tweets)
+ * • Take breaks between sessions to avoid rate limits
+ * • Disable privacy/ad-blockers for x.com if actions fail
+ * • Monitor the log for warnings; pause immediately if flagged
+ * • This script does NOT bypass CAPTCHAs or login walls
+ *
+ *
+ * 🐛 TROUBLESHOOTING
+ * ───────────────────────────────────────────────────────────────────────────────
+ * ⚠️ Rate Limit Detected:
+ *    → Wait 15+ minutes before resuming. Reduce volume/delays next session.
+ *
+ * 🛑 Actions Not Registering:
+ *    → Disable privacy/ad-blockers for x.com
+ *    → Check browser console for errors
+ *    → Refresh page and restart script
+ *
+ * 🧩 Privacy Blocker Warning:
+ *    → X detected extensions breaking page functionality
+ *    → Whitelist x.com in your blocker settings
+ *
+ * 📜 No New Tweets / End of Feed:
+ *    → Script auto-detects when feed is exhausted
+ *    → Press Restart to begin fresh session
+ *
+ * 🎭 Panel Not Appearing:
+ *    → Ensure userscript manager is enabled
+ *    → Check browser console for script errors
+ *    → Verify you're on a supported domain (x.com, twitter.com, mobile variants)
+ *
+ *
+ * 💖 SUPPORT THE DEVELOPER
+ * ───────────────────────────────────────────────────────────────────────────────
+ * If you find this script useful, consider supporting its continued development!
+ *
+ * ☕ Buy Me a Coffee:
+ *    https://buymeacoffee.com/esrevorter
+ *
+ * ₿ Bitcoin (BTC):
+ *    bc1qwd330n3m9exjfhmzs6r0fh4e73v0plmjv7pawppgv7k79j5ce4gqc6c7u2
+ *
+ * 🐙 GitHub:
+ *    https://github.com/Esrevorter/AutoFeed
+ *
+ * 📬 Report Issues:
+ *    https://github.com/Esrevorter/AutoFeed/issues
+ *
+ *
+ * 📜 LICENSE
+ * ───────────────────────────────────────────────────────────────────────────────
+ * See LICENSE file in the repository.
+ *
+ *
+ * 🏷️ VERSION HISTORY
+ * ───────────────────────────────────────────────────────────────────────────────
+ * v4.9 - Added mobile.twitter.com and mobile.x.com support
+ *      - Expanded domain matching to all x.com/twitter.com paths
+ *      - Added update/download URLs for automatic updates
+ *      - Enhanced documentation with installation & donation info
+ * v4.8 - Advanced human-like randomizer with dynamic attention drift
+ *      - Animated UI feedback (breathing status, chip bursts)
+ *      - Improved background tab keep-alive mechanisms
+ * [Earlier versions - see GitHub for full changelog]
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
 
 (function () {
     'use strict';
@@ -994,7 +1180,7 @@
         if (document.querySelector('[data-testid="primaryColumn"]')) {
             initObserver.disconnect();
             createUI();
-            console.log('%c⚡ Auto-Feed v4.8 loaded — Randomised Volume + Dynamic Drift + Animated UI', 'color:#1d9bf0;font-weight:bold;');
+            console.log('%c⚡ Auto-Feed v4.9 loaded — Randomised Volume + Dynamic Drift + Animated UI', 'color:#1d9bf0;font-weight:bold;');
         }
     });
     initObserver.observe(document.body, { childList: true, subtree: true });
