@@ -212,7 +212,7 @@ bc1qwd330n3m9exjfhmzs6r0fh4e73v0plmjv7pawppgv7k79j5ce4gqc6c7u2
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) file for details.
 
 **Disclaimer**: This script is provided as-is for educational and personal use only. The developer is not responsible for any consequences resulting from its use, including but not limited to account suspensions or violations of X's Terms of Service. Use responsibly and at your own risk.
 
