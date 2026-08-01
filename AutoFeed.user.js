@@ -83,81 +83,9 @@
 
     // Roll a random session target within the configured range
     function rollSessionTarget() {
-        const// ==UserScript==
-// @name         X.com Auto-Feed
-// @namespace    http://tampermonkey.net/
-// @version      4.8
-// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive, virtualisation-proof dedupe, end-of-list + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), RANDOMISED SESSION TARGETS, and ANIMATED UI feedback. (CSP-Proof)
-// @author       Esrevorter
-// @match        https://x.com/home
-// @match        https://x.com/i/lists/*
-// @match        https://twitter.com/i/lists/*
-// @match        https://x.com/*/lists/*
-// @match        https://twitter.com/*/lists/*
-// @grant        GM_addStyle
-// @run-at       document-idle
-// @inject-into  content
-// ==/UserScript==
-
-(function () {
-    'use strict';
-
-    const $ = (id) => document.getElementById(id);
-    const SETTINGS_KEY = 'xAutoFeedSettingsV4';
-    const POS_KEY = 'xAutoFeedPanelPosV4';
-
-    const DEFAULTS = {
-        enableLike: true, enableRetweet: false, enableBookmark: false,
-        randomizeActions: true,
-        randomizeOrder: false,
-        keepAliveSilent: true, keepAliveAudible: false,
-        direction: 'down',
-        minDelay: 4000, maxDelay: 9000,
-        minTweets: 50, maxTweets: 200,   // Humanised session target range
-    };
-
-    // --- STATE ---
-    const state = {
-        isRunning: false, isPaused: false, bgMode: document.hidden,
-        actionCount: 0, maxActions: 100,
-        enableLike: true, enableRetweet: false, enableBookmark: false,
-        randomizeActions: true,
-        randomizeOrder: false,
-        keepAliveSilent: true, keepAliveAudible: false,
-        direction: 'down',
-        minDelay: 4000, maxDelay: 9000,
-        minTweets: 50, maxTweets: 200,
-        likeCount: 0, rtCount: 0, bmCount: 0,
-        processedIds: new Set(),
-        emptyStreak: 0, privacyWarned: false,
-        consecutiveFailures: 0,
-        audioCtx: null, silentNode: null, silentGain: null, audibleTimer: null,
-        focusLevel: 0.5,
-    };
-
-    function loadSettings() {
-        try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
-        catch (e) { return Object.assign({}, DEFAULTS); }
-    }
-
-    function persistSettings() {
-        try {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-                enableLike: $('chk-like').checked,
-                enableRetweet: $('chk-rt').checked,
-                enableBookmark: $('chk-bm').checked,
-                randomizeActions: $('tgl-random').classList.contains('x-on'),
-                randomizeOrder: $('tgl-randomizer').classList.contains('x-on'),
-                keepAliveSilent: $('tgl-silent').classList.contains('x-on'),
-                keepAliveAudible: $('tgl-audible').classList.contains('x-on'),
-                direction: state.direction,
-                minDelay: parseInt($('inp-min').value) || 4000,
-                maxDelay: parseInt($('inp-max').value) || 9000,
-                minTweets: parseInt($('inp-tmin').value) || 50,
-                maxTweets: parseInt($('inp-tmax').value) || 200,
-            }));
-        } catch (e) {}
-        refreshFoldSummaries();
+        const lo = Math.min(state.volMin, state.volMax);
+        const hi = Math.max(state.volMin, state.volMax);
+        return Math.floor(Math.random() * (hi - lo + 1)) + lo;
     }
 
     function loadPanelPos() { try { return JSON.parse(localStorage.getItem(POS_KEY) || 'null'); } catch (e) { return null; } }
@@ -203,7 +131,6 @@
                 padding: 12px 14px; border-bottom:1px solid #333; cursor: grab; user-select: none; flex: 0 0 auto;
                 position: relative; overflow: hidden; }
             .x-header.x-grabbing { cursor: grabbing; }
-
             .x-header.x-scanning::after {
                 content: ''; position: absolute; top: 0; left: -20%; width: 20%; height: 100%;
                 background: linear-gradient(90deg, transparent, rgba(29,155,240,0.15), transparent);
@@ -229,7 +156,7 @@
             .x-fold-chev { color:#71767b; font-size:10px; transition:transform .25s ease; flex-shrink:0; }
             .x-fold.x-open .x-fold-chev { transform: rotate(180deg); }
             .x-fold-body { max-height:0; overflow:hidden; transition:max-height .28s ease; }
-            .x-fold.x-open .x-fold-body { max-height:500px; }
+            .x-fold.x-open .x-fold-body { max-height:440px; }
             .x-fold-inner { padding: 2px 0 8px; }
 
             .x-mb-8 { margin-bottom:8px; } .x-mb-0 { margin-bottom:0; }
@@ -249,7 +176,6 @@
             .x-delay-col { flex:1; }
             .x-delay-label { font-size:11px; color:#71767b; display:block; }
             .x-delay-input { width:100%; background:#2f3336; border:1px solid #333; color:white; border-radius:4px; padding:4px; margin-top:2px; box-sizing:border-box; }
-            .x-delay-hint { font-size:9px; color:#536471; margin-top:2px; }
 
             .x-counter { margin-bottom:4px; font-size:12px; color:#71767b; display: flex; justify-content: space-between; }
             .x-count-val { color:#e7e9ea; font-weight:bold; }
@@ -261,7 +187,6 @@
             .x-action-chip { flex:1; text-align:center; padding:6px 4px; border-radius:8px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); transition: transform 0.2s ease, box-shadow 0.2s ease; }
             .x-chip-like { color:#f91880; } .x-chip-rt { color:#00ba7c; } .x-chip-bm { color:#1d9bf0; }
             .x-chip-val { font-size:16px; display:block; }
-
             @keyframes xChipBurst {
                 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
                 40% { transform: scale(1.15); }
@@ -279,7 +204,6 @@
             .x-warning { margin-top:8px; background:#3a1c1c; border:1px solid #f4212e; color:#f4212e; padding:8px; border-radius:6px; font-size:11px; text-align:center; }
             .x-hide { display:none !important; }
             .x-log { max-height:72px; overflow-y:auto; font-size:10px; color:#536471; padding:6px 8px; background:rgba(0,0,0,0.25); border-radius:6px; margin-top:8px; font-family:monospace; line-height:1.5; }
-
             @keyframes xSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
             .x-log-entry { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; animation: xSlideIn 0.3s ease-out; }
 
@@ -292,6 +216,9 @@
             .x-toggle.x-on::after { transform:translateX(16px); }
 
             .x-combo-preview { font-size:10px; color:#536471; padding:6px 8px; background:rgba(255,255,255,0.02); border-radius:6px; margin-top:4px; line-height:1.6; }
+
+            .x-vol-hint { font-size:10px; color:#536471; margin-top:6px; line-height:1.4; }
+            .x-vol-rolled { font-size:11px; color:#00ba7c; font-weight:700; margin-top:4px; text-align:center; }
 
             @keyframes xbreath   { 0%,100%{ box-shadow:0 0 0 0 rgba(29,155,240,0.0); } 50%{ box-shadow:0 0 0 3px rgba(29,155,240,0.18); } }
             @keyframes xbreathbg { 0%,100%{ box-shadow:0 0 0 0 rgba(10,106,168,0.0); } 50%{ box-shadow:0 0 0 3px rgba(10,106,168,0.22); } }
@@ -346,6 +273,25 @@
                             <div class="x-combo-preview" id="x-combo-preview"></div>
                         </div></div>
                     </div>
+
+                    <div class="x-fold" data-fold="session">
+                        <div class="x-fold-head">
+                            <span class="x-fold-title">Session volume</span>
+                            <span class="x-fold-sum" id="sum-vol"></span>
+                            <span class="x-fold-chev">▾</span>
+                        </div>
+                        <div class="x-fold-body"><div class="x-fold-inner">
+                            <div class="x-delay-group x-mb-0">
+                                <div class="x-delay-col"><label class="x-delay-label">Min tweets</label>
+                                    <input type="number" id="inp-vol-min" class="x-delay-input" min="${VOL_ABS_MIN}" max="${VOL_ABS_MAX}" value="50"></div>
+                                <div class="x-delay-col"><label class="x-delay-label">Max tweets</label>
+                                    <input type="number" id="inp-vol-max" class="x-delay-input" min="${VOL_ABS_MIN}" max="${VOL_ABS_MAX}" value="200"></div>
+                            </div>
+                            <div class="x-vol-hint">🎯 A random target is rolled within this range each time you press <strong>Start</strong>. No two sessions process the same count.</div>
+                            <div class="x-vol-rolled x-hide" id="x-vol-rolled"></div>
+                        </div></div>
+                    </div>
+
                     <div class="x-fold" data-fold="dir">
                         <div class="x-fold-head">
                             <span class="x-fold-title">Scroll direction</span>
@@ -378,24 +324,17 @@
                             </div>
                         </div></div>
                     </div>
-                    <div class="x-fold" data-fold="timing">
+                    <div class="x-fold" data-fold="delay">
                         <div class="x-fold-head">
-                            <span class="x-fold-title">Timing & Limits</span>
-                            <span class="x-fold-sum" id="sum-timing"></span>
+                            <span class="x-fold-title">Delays</span>
+                            <span class="x-fold-sum" id="sum-delay"></span>
                             <span class="x-fold-chev">▾</span>
                         </div>
                         <div class="x-fold-body"><div class="x-fold-inner">
-                            <div class="x-delay-group x-mb-8">
-                                <div class="x-delay-col"><label class="x-delay-label">🎯 Min Tweets</label>
-                                    <input type="number" id="inp-tmin" class="x-delay-input" value="50" min="10" max="1000"></div>
-                                <div class="x-delay-col"><label class="x-delay-label">🎯 Max Tweets</label>
-                                    <input type="number" id="inp-tmax" class="x-delay-input" value="200" min="10" max="1000"></div>
-                            </div>
-                            <div class="x-delay-hint x-mb-8">Random target picked each session within this range</div>
                             <div class="x-delay-group x-mb-0">
-                                <div class="x-delay-col"><label class="x-delay-label">⏱️ Min Delay (ms)</label>
+                                <div class="x-delay-col"><label class="x-delay-label">Min Delay (ms)</label>
                                     <input type="number" id="inp-min" class="x-delay-input" value="4000"></div>
-                                <div class="x-delay-col"><label class="x-delay-label">⏱️ Max Delay (ms)</label>
+                                <div class="x-delay-col"><label class="x-delay-label">Max Delay (ms)</label>
                                     <input type="number" id="inp-max" class="x-delay-input" value="9000"></div>
                             </div>
                         </div></div>
@@ -435,15 +374,15 @@
         $('tgl-audible').classList.toggle('x-on', s.keepAliveAudible);
         $('inp-min').value = s.minDelay;
         $('inp-max').value = s.maxDelay;
-        $('inp-tmin').value = s.minTweets;
-        $('inp-tmax').value = s.maxTweets;
+        $('inp-vol-min').value = s.volMin;
+        $('inp-vol-max').value = s.volMax;
 
         state.randomizeActions = s.randomizeActions;
         state.randomizeOrder = s.randomizeOrder;
         state.keepAliveSilent = s.keepAliveSilent;
         state.keepAliveAudible = s.keepAliveAudible;
-        state.minTweets = s.minTweets;
-        state.maxTweets = s.maxTweets;
+        state.volMin = s.volMin;
+        state.volMax = s.volMax;
         state.direction = (s.direction === 'up') ? 'up' : 'down';
         $('seg-dir').querySelectorAll('.x-seg-btn').forEach(b =>
             b.classList.toggle('x-seg-active', b.getAttribute('data-dir') === state.direction));
@@ -463,7 +402,7 @@
     }
 
     function refreshFoldSummaries() {
-        const a = $('sum-actions'), d = $('sum-dir'), b = $('sum-bg'), t = $('sum-timing');
+        const a = $('sum-actions'), d = $('sum-dir'), b = $('sum-bg'), dl = $('sum-delay'), v = $('sum-vol');
         if (a) {
             const em = [];
             if ($('chk-like').checked) em.push('❤️');
@@ -475,15 +414,10 @@
             if (rndOrd) sum += ' · 🔀 drift';
             a.textContent = sum;
         }
+        if (v) v.textContent = ($('inp-vol-min').value || 0) + '–' + ($('inp-vol-max').value || 0) + ' tweets';
         if (d) d.textContent = state.direction === 'down' ? '⬇️ top→down' : '⬆️ bottom→up';
         if (b) b.textContent = '🔇' + (state.keepAliveSilent ? 'on' : 'off') + ' · 🔊' + (state.keepAliveAudible ? 'on' : 'off');
-        if (t) {
-            const tmin = $('inp-tmin').value || 50;
-            const tmax = $('inp-tmax').value || 200;
-            const dmin = $('inp-min').value || 4000;
-            const dmax = $('inp-max').value || 9000;
-            t.textContent = '🎯' + tmin + '–' + tmax + ' · ⏱️' + dmin + '–' + dmax + 'ms';
-        }
+        if (dl) dl.textContent = ($('inp-min').value || 0) + '–' + ($('inp-max').value || 0) + ' ms';
     }
 
     function setupEventListeners() {
@@ -500,7 +434,7 @@
         bindToggle('tgl-silent', 'keepAliveSilent', refreshKeepAlive);
         bindToggle('tgl-audible', 'keepAliveAudible', refreshKeepAlive);
         ['chk-like', 'chk-rt', 'chk-bm'].forEach(id => $(id).addEventListener('change', () => { persistSettings(); updateComboPreview(); }));
-        ['inp-min', 'inp-max', 'inp-tmin', 'inp-tmax'].forEach(id => $(id).addEventListener('change', persistSettings));
+        ['inp-min', 'inp-max', 'inp-vol-min', 'inp-vol-max'].forEach(id => $(id).addEventListener('change', persistSettings));
 
         $('x-folds').addEventListener('click', (e) => {
             const head = e.target.closest('.x-fold-head'); if (!head) return;
@@ -553,13 +487,17 @@
             state.enableBookmark = $('chk-bm').checked;
             state.minDelay = parseInt($('inp-min').value) || 4000;
             state.maxDelay = parseInt($('inp-max').value) || 9000;
-            state.minTweets = Math.max(10, parseInt($('inp-tmin').value) || 50);
-            state.maxTweets = Math.max(state.minTweets, parseInt($('inp-tmax').value) || 200);
+            state.volMin = clampVol(parseInt($('inp-vol-min').value) || 50);
+            state.volMax = clampVol(parseInt($('inp-vol-max').value) || 200);
+            // Clamp the inputs visually so the user sees the enforced bounds
+            $('inp-vol-min').value = state.volMin;
+            $('inp-vol-max').value = state.volMax;
             persistSettings();
 
             if (!state.enableLike && !state.enableRetweet && !state.enableBookmark) {
                 alert('Please enable at least one action (Like, Retweet, or Bookmark).'); return;
             }
+
             if ($('btn-start').innerText === 'Restart') {
                 state.actionCount = 0; state.likeCount = 0; state.rtCount = 0; state.bmCount = 0;
                 state.processedIds.clear();
@@ -570,16 +508,23 @@
                 $('x-percent').innerText = '0%';
                 $('btn-start').innerText = 'Start';
             }
+
+            // Roll a fresh random session target
+            state.maxActions = rollSessionTarget();
+            $('x-max').innerText = state.maxActions;
+            $('x-count').innerText = '0';
+            $('x-progress').style.width = '0%';
+            $('x-percent').innerText = '0%';
+
+            // Show the rolled target in the Session fold
+            const rolledEl = $('x-vol-rolled');
+            rolledEl.textContent = '🎯 This session: ' + state.maxActions + ' tweets';
+            rolledEl.classList.remove('x-hide');
+
             state.emptyStreak = 0;
             state.privacyWarned = false;
             state.consecutiveFailures = 0;
             state.focusLevel = 0.5 + (Math.random() * 0.4);
-
-            // --- HUMANISED SESSION TARGET ---
-            // Pick a random target within the user-defined range each session
-            state.maxActions = Math.floor(Math.random() * (state.maxTweets - state.minTweets + 1)) + state.minTweets;
-            $('x-max').innerText = state.maxActions;
-
             ensureAudio();
             state.isRunning = true; state.isPaused = false;
 
@@ -589,9 +534,9 @@
 
             updateUIState('RUNNING'); refreshKeepAlive();
             addLog('▶️ Started — ' + getEnabledActionsLabel() +
-                   ' | 🎯 target: ' + state.maxActions + ' tweets' +
                    ' | ' + (state.direction === 'down' ? '⬇️ top→down' : '⬆️ bottom→up') +
-                   (state.randomizeOrder ? ' | 🔀 Drift ON' : ''));
+                   (state.randomizeOrder ? ' | 🔀 Drift' : '') +
+                   ' | 🎯 target: ' + state.maxActions);
             mainLoop();
         });
 
@@ -662,7 +607,7 @@
 
         $('x-count').innerText = state.actionCount;
 
-        const pct = state.maxActions > 0 ? Math.min(100, Math.round((state.actionCount / state.maxActions) * 100)) : 0;
+        const pct = Math.min(100, Math.round((state.actionCount / state.maxActions) * 100));
         progress.style.width = pct + '%';
         percent.innerText = pct + '%';
 
@@ -1049,7 +994,7 @@
         if (document.querySelector('[data-testid="primaryColumn"]')) {
             initObserver.disconnect();
             createUI();
-            console.log('%c⚡ Auto-Feed v4.8 loaded — Randomised Targets + Dynamic Drift + Animated UI', 'color:#1d9bf0;font-weight:bold;');
+            console.log('%c⚡ Auto-Feed v4.8 loaded — Randomised Volume + Dynamic Drift + Animated UI', 'color:#1d9bf0;font-weight:bold;');
         }
     });
     initObserver.observe(document.body, { childList: true, subtree: true });
