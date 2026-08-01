@@ -2,6 +2,91 @@
 // @name         X.com Auto-Feed
 // @namespace    http://tampermonkey.net/
 // @version      4.8
+// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive, virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
+// @author       Esrevorter
+// @match        https://x.com/home
+// @match        https://x.com/i/lists/*
+// @match        https://twitter.com/i/lists/*
+// @match        https://x.com/*/lists/*
+// @match        https://twitter.com/*/lists/*
+// @grant        GM_addStyle
+// @run-at       document-idle
+// @inject-into  content
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    const $ = (id) => document.getElementById(id);
+    const SETTINGS_KEY = 'xAutoFeedSettingsV4';
+    const POS_KEY = 'xAutoFeedPanelPosV4';
+
+    // Safe bounds for the session volume range
+    const VOL_ABS_MIN = 20;
+    const VOL_ABS_MAX = 500;
+
+    const DEFAULTS = {
+        enableLike: true, enableRetweet: false, enableBookmark: false,
+        randomizeActions: true,
+        randomizeOrder: false,
+        keepAliveSilent: true, keepAliveAudible: false,
+        direction: 'down',
+        minDelay: 4000, maxDelay: 9000,
+        volMin: 50, volMax: 200,          // NEW: session volume range
+    };
+
+    // --- STATE ---
+    const state = {
+        isRunning: false, isPaused: false, bgMode: document.hidden,
+        actionCount: 0, maxActions: 100,   // maxActions is now set randomly per session
+        enableLike: true, enableRetweet: false, enableBookmark: false,
+        randomizeActions: true,
+        randomizeOrder: false,
+        keepAliveSilent: true, keepAliveAudible: false,
+        direction: 'down',
+        minDelay: 4000, maxDelay: 9000,
+        volMin: 50, volMax: 200,           // NEW
+        likeCount: 0, rtCount: 0, bmCount: 0,
+        processedIds: new Set(),
+        emptyStreak: 0, privacyWarned: false,
+        consecutiveFailures: 0,
+        audioCtx: null, silentNode: null, silentGain: null, audibleTimer: null,
+        focusLevel: 0.5,
+    };
+
+    function loadSettings() {
+        try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
+        catch (e) { return Object.assign({}, DEFAULTS); }
+    }
+
+    function persistSettings() {
+        try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+                enableLike: $('chk-like').checked,
+                enableRetweet: $('chk-rt').checked,
+                enableBookmark: $('chk-bm').checked,
+                randomizeActions: $('tgl-random').classList.contains('x-on'),
+                randomizeOrder: $('tgl-randomizer').classList.contains('x-on'),
+                keepAliveSilent: $('tgl-silent').classList.contains('x-on'),
+                keepAliveAudible: $('tgl-audible').classList.contains('x-on'),
+                direction: state.direction,
+                minDelay: parseInt($('inp-min').value) || 4000,
+                maxDelay: parseInt($('inp-max').value) || 9000,
+                volMin: clampVol(parseInt($('inp-vol-min').value) || 50),
+                volMax: clampVol(parseInt($('inp-vol-max').value) || 200),
+            }));
+        } catch (e) {}
+        refreshFoldSummaries();
+    }
+
+    function clampVol(v) { return Math.max(VOL_ABS_MIN, Math.min(VOL_ABS_MAX, v)); }
+
+    // Roll a random session target within the configured range
+    function rollSessionTarget() {
+        const// ==UserScript==
+// @name         X.com Auto-Feed
+// @namespace    http://tampermonkey.net/
+// @version      4.8
 // @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive, virtualisation-proof dedupe, end-of-list + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), RANDOMISED SESSION TARGETS, and ANIMATED UI feedback. (CSP-Proof)
 // @author       Esrevorter
 // @match        https://x.com/home
