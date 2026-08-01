@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         X.com Auto-Feed
 // @namespace    http://tampermonkey.net/
-// @version      4.9
-// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive, virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
+// @version      5.0
+// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive (Silent/Audible/Ping+Nudge modes + Wake Lock API), virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
 // @author       Esrevorter
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -18,7 +18,7 @@
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * ⚡ X.COM AUTO-FEED v4.9
+ * ⚡ X.COM AUTO-FEED v5.0
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  * 📖 DESCRIPTION
@@ -38,8 +38,13 @@
  *   PROGRESSIVE SCROLL     backlog/For-You feeds
  * • FOLDED CONFIG UI     - Collapsible sections keep the interface compact
  * • PINNED CONTROLS      - Floating, draggable panel stays accessible
- * • BACKGROUND TAB       - Silent audio keep-alive defeats browser timer throttling
- *   KEEP-ALIVE             when tab is hidden; optional audible ping mode
+ * • BACKGROUND TAB       - Multi-mode keep-alive system defeats browser timer
+ *   KEEP-ALIVE             throttling when tab is hidden:
+ *                          → 🔇 Silent: Inaudible audio tone (default)
+ *                          → 🔊 Audible: Faint blips every 6 seconds
+ *                          → ⚡ Ping+Nudge: Aggressive 2s pings + micro-scrolls
+ *                          → 🔒 Wake Lock API: Prevents screen sleep (modern browsers)
+ *                          → 💓 Heartbeat: DOM touches keep renderer engaged
  * • VIRTUALIZATION-PROOF - Robust tweet ID deduplication survives DOM recycling
  * • END-OF-FEED          - Detects when X has no more content to load
  *   DETECTION
@@ -120,9 +125,12 @@
  *   ⬇️ Top→Down        - Start from newest tweets (ideal for Feeds/Lists)
  *   ⬆️ Bottom→Up       - Start from oldest visible tweets (For-You/backlog)
  *
- * Background Tab:
+ * Background Tab (NEW in v5.0):
  *   🔇 Silent Keep-Alive  - Uses inaudible audio to prevent timer throttling
  *   🔊 Audible Ping       - Faint blips every 6 seconds when tab is hidden
+ *   ⚡ Ping + Scroll Nudge - Aggressive mode: 2s pings + micro-scrolls (best for stubborn browsers)
+ *   🔒 Wake Lock API      - Automatically requests wake lock to prevent screen sleep
+ *   💓 Heartbeat          - DOM touches keep JavaScript engine active
  *
  * Delays:
  *   Min Delay (ms)     - Minimum wait between actions (default: 4000ms)
@@ -188,6 +196,12 @@
  *
  * 🏷️ VERSION HISTORY
  * ───────────────────────────────────────────────────────────────────────────────
+ * v5.0 - ENHANCED BACKGROUND TAB SUPPORT (addresses "IO asleep" issue)
+ *      - ⚡ NEW: Ping + Scroll Nudge mode - Aggressive 2s audio pings + micro-scrolls
+ *      - 🔒 NEW: Wake Lock API integration - Prevents screen sleep on modern browsers
+ *      - 💓 NEW: Heartbeat mechanism - DOM touches keep JS engine active
+ *      - 🎯 Best for stubborn browsers that throttle background tabs heavily
+ *      - Recommendation: Use "Ping + Scroll Nudge" mode for best results
  * v4.9 - Added mobile.twitter.com and mobile.x.com support
  *      - Expanded domain matching to all x.com/twitter.com paths
  *      - Added update/download URLs for automatic updates
@@ -215,7 +229,7 @@
         enableLike: true, enableRetweet: false, enableBookmark: false,
         randomizeActions: true,
         randomizeOrder: false,
-        keepAliveSilent: true, keepAliveAudible: false,
+        keepAliveSilent: true, keepAliveAudible: false, keepAlivePing: false,
         direction: 'down',
         minDelay: 4000, maxDelay: 9000,
         volMin: 50, volMax: 200,          // NEW: session volume range
@@ -228,7 +242,7 @@
         enableLike: true, enableRetweet: false, enableBookmark: false,
         randomizeActions: true,
         randomizeOrder: false,
-        keepAliveSilent: true, keepAliveAudible: false,
+        keepAliveSilent: true, keepAliveAudible: false, keepAlivePing: false,
         direction: 'down',
         minDelay: 4000, maxDelay: 9000,
         volMin: 50, volMax: 200,           // NEW
@@ -236,7 +250,8 @@
         processedIds: new Set(),
         emptyStreak: 0, privacyWarned: false,
         consecutiveFailures: 0,
-        audioCtx: null, silentNode: null, silentGain: null, audibleTimer: null,
+        audioCtx: null, silentNode: null, silentGain: null, audibleTimer: null, pingTimer: null,
+        wakeLock: null, heartbeatInterval: null,
         focusLevel: 0.5,
     };
 
@@ -255,6 +270,7 @@
                 randomizeOrder: $('tgl-randomizer').classList.contains('x-on'),
                 keepAliveSilent: $('tgl-silent').classList.contains('x-on'),
                 keepAliveAudible: $('tgl-audible').classList.contains('x-on'),
+                keepAlivePing: $('tgl-ping').classList.contains('x-on'),
                 direction: state.direction,
                 minDelay: parseInt($('inp-min').value) || 4000,
                 maxDelay: parseInt($('inp-max').value) || 9000,
@@ -503,10 +519,15 @@
                                 <div class="x-toggle-sub">No sound; defeats timer throttling on most builds</div></div>
                                 <div class="x-toggle x-on" id="tgl-silent"></div>
                             </div>
-                            <div class="x-toggle-wrap x-mb-0">
+                            <div class="x-toggle-wrap">
                                 <div><div class="x-toggle-label">🔊 Audible ping</div>
                                 <div class="x-toggle-sub">Faint blip ONLY while hidden — keeps rendering/IO alive</div></div>
                                 <div class="x-toggle" id="tgl-audible"></div>
+                            </div>
+                            <div class="x-toggle-wrap x-mb-0">
+                                <div><div class="x-toggle-label">⚡ Ping + Scroll Nudge</div>
+                                <div class="x-toggle-sub">Aggressive mode: pings every 2s + scrolls to prevent sleep</div></div>
+                                <div class="x-toggle" id="tgl-ping"></div>
                             </div>
                         </div></div>
                     </div>
@@ -558,6 +579,7 @@
         $('tgl-randomizer').classList.toggle('x-on', s.randomizeOrder);
         $('tgl-silent').classList.toggle('x-on', s.keepAliveSilent);
         $('tgl-audible').classList.toggle('x-on', s.keepAliveAudible);
+        $('tgl-ping').classList.toggle('x-on', s.keepAlivePing);
         $('inp-min').value = s.minDelay;
         $('inp-max').value = s.maxDelay;
         $('inp-vol-min').value = s.volMin;
@@ -567,6 +589,7 @@
         state.randomizeOrder = s.randomizeOrder;
         state.keepAliveSilent = s.keepAliveSilent;
         state.keepAliveAudible = s.keepAliveAudible;
+        state.keepAlivePing = s.keepAlivePing;
         state.volMin = s.volMin;
         state.volMax = s.volMax;
         state.direction = (s.direction === 'up') ? 'up' : 'down';
@@ -619,6 +642,7 @@
         bindToggle('tgl-randomizer', 'randomizeOrder', refreshFoldSummaries);
         bindToggle('tgl-silent', 'keepAliveSilent', refreshKeepAlive);
         bindToggle('tgl-audible', 'keepAliveAudible', refreshKeepAlive);
+        bindToggle('tgl-ping', 'keepAlivePing', refreshKeepAlive);
         ['chk-like', 'chk-rt', 'chk-bm'].forEach(id => $(id).addEventListener('change', () => { persistSettings(); updateComboPreview(); }));
         ['inp-min', 'inp-max', 'inp-vol-min', 'inp-vol-max'].forEach(id => $(id).addEventListener('change', persistSettings));
 
@@ -693,6 +717,9 @@
                 $('x-progress').style.width = '0%';
                 $('x-percent').innerText = '0%';
                 $('btn-start').innerText = 'Start';
+                
+                // Clean up any existing keep-alive mechanisms
+                releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
             }
 
             // Roll a fresh random session target
@@ -827,12 +854,16 @@
             statusEl.innerText = 'End of feed'; statusEl.classList.add('x-status-finished');
             btnStart.classList.remove('x-hide'); btnStart.innerText = 'Restart';
             btnPause.classList.add('x-hide'); btnResume.classList.add('x-hide');
-            state.isRunning = false; refreshKeepAlive();
+            state.isRunning = false; 
+            refreshKeepAlive();
+            releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
         } else if (status === 'FINISHED') {
             statusEl.innerText = 'Finished'; statusEl.classList.add('x-status-finished');
             btnStart.classList.remove('x-hide'); btnStart.innerText = 'Restart';
             btnPause.classList.add('x-hide'); btnResume.classList.add('x-hide');
-            state.isRunning = false; refreshKeepAlive();
+            state.isRunning = false; 
+            refreshKeepAlive();
+            releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
             addLog('✅ Finished! ' + state.actionCount + ' tweets processed (target was ' + state.maxActions + ').');
         }
     }
@@ -947,7 +978,7 @@
         return false;
     }
 
-    // --- KEEP-ALIVE AUDIO ---
+    // --- KEEP-ALIVE AUDIO & WAKE LOCK ---
     function ensureAudio() {
         if (state.audioCtx) { if (state.audioCtx.state === 'suspended') state.audioCtx.resume().catch(() => {}); return state.audioCtx; }
         try { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) state.audioCtx = new Ctx(); } catch (e) {}
@@ -982,10 +1013,87 @@
         }, 6000);
     }
     function stopAudible() { if (state.audibleTimer) { clearInterval(state.audibleTimer); state.audibleTimer = null; } }
+    
+    // NEW: Aggressive ping + scroll nudge mode for stubborn browsers
+    function startPingNudge() {
+        if (state.pingTimer) return;
+        const ctx = ensureAudio(); if (!ctx) return;
+        
+        const pingAndNudge = () => {
+            if (!document.hidden || !state.isRunning || state.isPaused) return;
+            
+            // Play a quick ping
+            try {
+                const o = ctx.createOscillator(), g = ctx.createGain();
+                o.type = 'square'; o.frequency.value = 1200;
+                g.gain.setValueAtTime(0.0001, ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.02, ctx.currentTime + 0.01);
+                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.03);
+                o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.04);
+            } catch (e) {}
+            
+            // Perform a micro-scroll to trigger render pipeline
+            try {
+                const scrollStep = state.direction === 'down' ? 50 : -50;
+                window.scrollBy({ top: scrollStep, behavior: 'auto' });
+                setTimeout(() => window.scrollBy({ top: -scrollStep, behavior: 'auto' }), 100);
+            } catch (e) {}
+        };
+        
+        pingAndNudge();
+        state.pingTimer = setInterval(pingAndNudge, 2000);
+    }
+    function stopPingNudge() { 
+        if (state.pingTimer) { clearInterval(state.pingTimer); state.pingTimer = null; } 
+    }
+    
+    // NEW: Wake Lock API for modern browsers
+    async function acquireWakeLock() {
+        if (state.wakeLock) return;
+        try {
+            if ('wakeLock' in navigator) {
+                state.wakeLock = await navigator.wakeLock.request('screen');
+                addLog('🔒 Wake Lock acquired — screen will stay awake');
+                state.wakeLock.addEventListener('release', () => {
+                    addLog('🔓 Wake Lock released');
+                });
+            }
+        } catch (e) {
+            // Wake Lock not supported or denied
+        }
+    }
+    function releaseWakeLock() {
+        if (state.wakeLock) {
+            state.wakeLock.release().catch(() => {});
+            state.wakeLock = null;
+        }
+    }
+    
+    // NEW: Heartbeat to keep JS engine active
+    function startHeartbeat() {
+        if (state.heartbeatInterval) return;
+        state.heartbeatInterval = setInterval(() => {
+            if (!state.isRunning || state.isPaused) return;
+            // Touch the DOM to keep renderer engaged
+            try {
+                const status = $('x-status');
+                if (status) { const t = status.innerText; status.innerText = t; }
+            } catch (e) {}
+        }, 1000);
+    }
+    function stopHeartbeat() {
+        if (state.heartbeatInterval) { clearInterval(state.heartbeatInterval); state.heartbeatInterval = null; }
+    }
+    
     function refreshKeepAlive() {
         const active = state.isRunning && !state.isPaused;
         if (state.keepAliveSilent && active) startSilent(); else stopSilent();
         if (state.keepAliveAudible && active && document.hidden) startAudible(); else stopAudible();
+        if (state.keepAlivePing && active && document.hidden) { startPingNudge(); startHeartbeat(); } 
+        else { stopPingNudge(); stopHeartbeat(); }
+        
+        // Wake Lock is independent of audio modes - always try when running in background
+        if (active && document.hidden) acquireWakeLock(); else releaseWakeLock();
     }
 
     // --- ACTIONS ---
