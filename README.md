@@ -3,6 +3,7 @@
 [![Tampermonkey](https://img.shields.io/badge/Tampermonkey-Userscript-00485B?style=for-the-badge&logo=tampermonkey)](https://www.tampermonkey.net/)
 [![License](https://img.shields.io/github/license/Esrevorter/AutoFeed?style=for-the-badge)](LICENSE)
 [![Version](https://img.shields.io/github/v/release/Esrevorter/AutoFeed?style=for-the-badge&label=Latest%20Version)](https://github.com/Esrevorter/AutoFeed/releases)
+[![Version 5.1](https://img.shields.io/badge/Current_Version-5.1-blue?style=for-the-badge)](https://github.com/Esrevorter/AutoFeed)
 
 > **Automate your X (Twitter) experience with intelligent, safe, and customizable feed interactions.**
 
@@ -110,10 +111,23 @@ Choose how the script navigates the feed:
 - **Up**: Reverse scrolling (bottom to top)
 
 ### Background Tab Mode
-Keep the script running when the tab is not active:
-- **Disabled**: Script pauses in background tabs
-- **Light**: Minimal keep-alive (saves resources)
-- **Aggressive**: Active keep-alive (more reliable but uses more resources)
+Keep the script running when the tab is not active (v5.1 Enhanced):
+
+| Mode | Description | Best For |
+|------|-------------|----------|
+| **Disabled** | Script pauses in background tabs | Active browsing only |
+| **Light** | Minimal keep-alive using DOM heartbeat | Saving resources |
+| **Aggressive** | Audio pings + scroll nudges + multi-strategy heartbeat | Maximum reliability |
+
+**🆕 v5.1 Background Improvements:**
+- ✅ Fresh AudioContext creation per ping to prevent browser suspension
+- ✅ Recursive setTimeout instead of setInterval to defeat throttling
+- ✅ Enhanced scroll nudge with CSS transforms for better visibility
+- ✅ Multi-strategy heartbeat (4 simultaneous approaches)
+- ✅ Transition pings when tabs go to background
+- ✅ Wake Lock API integration to prevent screen sleep
+
+> 💡 **Pro Tip**: For best background performance, use **Aggressive** mode with audible pings enabled. Modern browsers aggressively throttle background tabs to save resources. The audio cue helps maintain execution priority by signaling active user engagement. If you still experience "IO asleep" messages, try keeping a second dedicated window open or use the transition ping feature.
 
 ### Delay Settings
 Fine-tune the timing between actions:
@@ -176,6 +190,15 @@ Fine-tune the timing between actions:
 - **Browser Compatibility**: Try a different browser
 - **Conflicting Scripts**: Disable other userscripts temporarily
 
+#### 😴 Background Tab "IO Asleep" Messages
+If you see consecutive log messages about IO being asleep:
+- **Use Aggressive Mode**: Switch to "Aggressive" background tab mode
+- **Enable Audible Pings**: Ensure audio is not muted for the tab
+- **Check Browser Settings**: Some browsers have strict background throttling
+- **Try Dedicated Window**: Keep a second small window open for the tab
+- **Update to v5.1+**: Latest version has critical background fixes
+- **Verify Audio Context**: Make sure your browser allows audio in background
+
 ### Getting Help
 1. Check the [Issues page](https://github.com/Esrevorter/AutoFeed/issues)
 2. Search for similar problems in existing issues
@@ -220,7 +243,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🏷️ Version History
 
-### v4.9 (Current)
+### v5.1 (Current - Latest)
+- 🎯 **Critical Background Tab Fixes**: Resolved "IO asleep" throttling issues
+  - Fresh AudioContext creation per ping prevents browser suspension
+  - Recursive setTimeout defeats aggressive interval throttling
+  - Enhanced scroll nudge with CSS transforms for visibility
+  - Multi-strategy heartbeat (4 simultaneous approaches)
+  - Transition pings when tabs switch to background
+  - Wake Lock API integration prevents screen sleep
+- ✅ Improved Aggressive mode reliability for background operation
+- ✅ Better handling of browser throttling mechanisms
+- ✅ Updated documentation with background usage best practices
+
+### v5.0
+- 🌐 **Enhanced Background Support**: Added Ping + Scroll Nudge mode
+- 🔒 Wake Lock API integration for preventing screen sleep
+- 💓 Heartbeat mechanism using DOM touches
+- 📊 Improved logging for background state detection
+
+### v4.9
 - ✅ Added support for mobile.twitter.com and mobile.x.com domains
 - ✅ Integrated automatic update mechanism via GitHub
 - ✅ Enhanced documentation with comprehensive troubleshooting guide
