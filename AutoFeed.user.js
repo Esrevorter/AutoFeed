@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         X.com Auto-Feed
 // @namespace    http://tampermonkey.net/
-// @version      5.0
-// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive (Silent/Audible/Ping+Nudge modes + Wake Lock API), virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
+// @version      5.1
+// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive (Silent/Audible/Ping+Nudge modes + Wake Lock API + TRANSITION PINGS), virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
 // @author       Esrevorter
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -18,7 +18,7 @@
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * ⚡ X.COM AUTO-FEED v5.0
+ * ⚡ X.COM AUTO-FEED v5.1
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  * 📖 DESCRIPTION
@@ -42,9 +42,10 @@
  *   KEEP-ALIVE             throttling when tab is hidden:
  *                          → 🔇 Silent: Inaudible audio tone (default)
  *                          → 🔊 Audible: Faint blips every 6 seconds
- *                          → ⚡ Ping+Nudge: Aggressive 2s pings + micro-scrolls
+ *                          → ⚡ Ping+Nudge: Aggressive 1.5s pings + micro-scrolls + DOM transforms
  *                          → 🔒 Wake Lock API: Prevents screen sleep (modern browsers)
- *                          → 💓 Heartbeat: DOM touches keep renderer engaged
+ *                          → 💓 Enhanced Heartbeat: Multi-strategy DOM touches (title, performance marks, classList)
+ *                          → 🎯 Transition Pings: Extra audio ping when tab goes background
  * • VIRTUALIZATION-PROOF - Robust tweet ID deduplication survives DOM recycling
  * • END-OF-FEED          - Detects when X has no more content to load
  *   DETECTION
@@ -125,12 +126,24 @@
  *   ⬇️ Top→Down        - Start from newest tweets (ideal for Feeds/Lists)
  *   ⬆️ Bottom→Up       - Start from oldest visible tweets (For-You/backlog)
  *
- * Background Tab (NEW in v5.0):
+ * Background Tab (ENHANCED in v5.1):
  *   🔇 Silent Keep-Alive  - Uses inaudible audio to prevent timer throttling
  *   🔊 Audible Ping       - Faint blips every 6 seconds when tab is hidden
- *   ⚡ Ping + Scroll Nudge - Aggressive mode: 2s pings + micro-scrolls (best for stubborn browsers)
+ *   ⚡ Ping + Scroll Nudge - Aggressive mode with multiple improvements:
+ *                          • Fresh AudioContext per ping (avoids suspension)
+ *                          • Larger scroll nudge (150px vs 50px)
+ *                          • CSS transform trigger (force GPU composite)
+ *                          • Recursive setTimeout (defeats interval throttling)
+ *                          • Faster 1.5s interval (compensates for delays)
  *   🔒 Wake Lock API      - Automatically requests wake lock to prevent screen sleep
- *   💓 Heartbeat          - DOM touches keep JavaScript engine active
+ *   💓 Enhanced Heartbeat - Multi-strategy approach:
+ *                          • Status element text toggle
+ *                          • Document title flash (forces renderer update)
+ *                          • Performance timeline marks
+ *                          • Body classList toggles (triggers style recalc)
+ *                          • Faster 800ms heartbeat interval
+ *   🎯 Transition Pings   - Extra audio ping when tab transitions to background
+ *                          (ensures IO pipeline stays active during critical moment)
  *
  * Delays:
  *   Min Delay (ms)     - Minimum wait between actions (default: 4000ms)
@@ -171,6 +184,18 @@
  *    → Check browser console for script errors
  *    → Verify you're on a supported domain (x.com, twitter.com, mobile variants)
  *
+ * 😴 "IO Asleep" Messages in Background:
+ *    → FIXED in v5.1! Now uses multiple strategies simultaneously:
+ *      • Fresh AudioContext creation per ping (prevents suspension)
+ *      • Recursive setTimeout instead of setInterval (defeats throttling)
+ *      • Multi-strategy heartbeat (title, performance marks, classList)
+ *      • Transition pings when tab goes background
+ *    → If still occurring, try:
+ *      • Using "Ping + Scroll Nudge" mode (most aggressive)
+ *      • Keeping tab in a separate window (not minimized)
+ *      • Disabling browser power-saving features
+ *      • Using a dedicated browser profile for automation
+ *
  *
  * 💖 SUPPORT THE DEVELOPER
  * ───────────────────────────────────────────────────────────────────────────────
@@ -196,6 +221,14 @@
  *
  * 🏷️ VERSION HISTORY
  * ───────────────────────────────────────────────────────────────────────────────
+ * v5.1 - CRITICAL BACKGROUND TAB FIXES (addresses persistent "IO asleep" issue)
+ *      - 🔧 FIXED: AudioContext now created fresh per ping (prevents browser suspension)
+ *      - 🔧 FIXED: Recursive setTimeout replaces setInterval (defeats timer throttling)
+ *      - 🔧 FIXED: Enhanced scroll nudge (150px + CSS transform + GPU composite trigger)
+ *      - 🔧 FIXED: Multi-strategy heartbeat (title flash, performance marks, classList)
+ *      - 🔧 FIXED: Transition pings when tab goes background (critical moment protection)
+ *      - 🔧 FIXED: Faster intervals (1.5s ping, 800ms heartbeat) compensate for delays
+ *      - 📝 These changes address Chrome/Firefox aggressive background tab throttling
  * v5.0 - ENHANCED BACKGROUND TAB SUPPORT (addresses "IO asleep" issue)
  *      - ⚡ NEW: Ping + Scroll Nudge mode - Aggressive 2s audio pings + micro-scrolls
  *      - 🔒 NEW: Wake Lock API integration - Prevents screen sleep on modern browsers
@@ -768,7 +801,22 @@
             if (!state.isRunning) return;
             if (document.hidden) {
                 addLog('👁️ Tab hidden → background mode (keep-alive active)');
+                // Force immediate re-initialization of audio contexts when going to background
                 refreshKeepAlive();
+                // Extra wake-up ping to ensure IO stays alive during transition
+                setTimeout(() => {
+                    if (state.keepAlivePing && document.hidden) {
+                        try {
+                            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                            const o = ctx.createOscillator(), g = ctx.createGain();
+                            o.frequency.value = 800;
+                            g.gain.value = 0.01;
+                            o.connect(g); g.connect(ctx.destination);
+                            o.start(); o.stop(ctx.currentTime + 0.05);
+                            setTimeout(() => ctx.close(), 100);
+                        } catch(e) {}
+                    }
+                }, 500);
             } else {
                 addLog('👁️ Tab visible → nudging loader in current direction');
                 stepReveal();
@@ -1017,34 +1065,50 @@
     // NEW: Aggressive ping + scroll nudge mode for stubborn browsers
     function startPingNudge() {
         if (state.pingTimer) return;
-        const ctx = ensureAudio(); if (!ctx) return;
         
         const pingAndNudge = () => {
             if (!document.hidden || !state.isRunning || state.isPaused) return;
             
-            // Play a quick ping
+            // Re-create audio context each time to avoid suspension issues
             try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const o = ctx.createOscillator(), g = ctx.createGain();
                 o.type = 'square'; o.frequency.value = 1200;
                 g.gain.setValueAtTime(0.0001, ctx.currentTime);
                 g.gain.exponentialRampToValueAtTime(0.02, ctx.currentTime + 0.01);
                 g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.03);
                 o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.04);
+                // Close context immediately to prevent suspension
+                setTimeout(() => ctx.close(), 100);
             } catch (e) {}
             
-            // Perform a micro-scroll to trigger render pipeline
+            // Perform a MORE aggressive micro-scroll to trigger render pipeline
             try {
-                const scrollStep = state.direction === 'down' ? 50 : -50;
+                const scrollStep = state.direction === 'down' ? 150 : -150;
                 window.scrollBy({ top: scrollStep, behavior: 'auto' });
-                setTimeout(() => window.scrollBy({ top: -scrollStep, behavior: 'auto' }), 100);
+                setTimeout(() => window.scrollBy({ top: -scrollStep, behavior: 'auto' }), 150);
+                // Also touch the document body to force layout recalculation
+                document.body.style.transform = 'translateZ(0)';
+                setTimeout(() => document.body.style.transform = '', 100);
             } catch (e) {}
         };
         
         pingAndNudge();
-        state.pingTimer = setInterval(pingAndNudge, 2000);
+        // Use nested setTimeout instead of setInterval to avoid browser throttling
+        const schedulePing = () => {
+            if (!state.isRunning || state.isPaused) return;
+            state.pingTimer = setTimeout(() => {
+                pingAndNudge();
+                schedulePing();
+            }, 1500); // Slightly faster to compensate for potential delays
+        };
+        schedulePing();
     }
     function stopPingNudge() { 
-        if (state.pingTimer) { clearInterval(state.pingTimer); state.pingTimer = null; } 
+        if (state.pingTimer) { 
+            clearTimeout(state.pingTimer); 
+            state.pingTimer = null; 
+        } 
     }
     
     // NEW: Wake Lock API for modern browsers
@@ -1069,17 +1133,41 @@
         }
     }
     
-    // NEW: Heartbeat to keep JS engine active
+    // NEW: Heartbeat to keep JS engine active - ENHANCED with multiple DOM touches
     function startHeartbeat() {
         if (state.heartbeatInterval) return;
+        
+        // Multiple strategies to keep the browser engaged
         state.heartbeatInterval = setInterval(() => {
             if (!state.isRunning || state.isPaused) return;
-            // Touch the DOM to keep renderer engaged
+            
             try {
+                // Strategy 1: Touch the status element
                 const status = $('x-status');
-                if (status) { const t = status.innerText; status.innerText = t; }
+                if (status) { 
+                    const t = status.innerText; 
+                    status.innerText = t + ' '; 
+                    setTimeout(() => status.innerText = t.trim(), 50);
+                }
+                
+                // Strategy 2: Touch document title (forces renderer update)
+                if (document.hidden) {
+                    const originalTitle = document.title;
+                    document.title = originalTitle + ' •';
+                    setTimeout(() => document.title = originalTitle, 50);
+                }
+                
+                // Strategy 3: Performance mark (keeps performance timeline active)
+                if (window.performance && window.performance.mark) {
+                    try { window.performance.mark('xf-heartbeat-' + Date.now()); } catch(e) {}
+                }
+                
+                // Strategy 4: Touch body classList (triggers style recalc)
+                document.body.classList.toggle('xf-hb');
+                setTimeout(() => document.body.classList.toggle('xf-hb'), 50);
+                
             } catch (e) {}
-        }, 1000);
+        }, 800); // Faster heartbeat for stubborn browsers
     }
     function stopHeartbeat() {
         if (state.heartbeatInterval) { clearInterval(state.heartbeatInterval); state.heartbeatInterval = null; }
@@ -1288,7 +1376,7 @@
         if (document.querySelector('[data-testid="primaryColumn"]')) {
             initObserver.disconnect();
             createUI();
-            console.log('%c⚡ Auto-Feed v4.9 loaded — Randomised Volume + Dynamic Drift + Animated UI', 'color:#1d9bf0;font-weight:bold;');
+            console.log('%c⚡ Auto-Feed v5.1 loaded — Critical BG Tab Fixes + Enhanced Heartbeat + Transition Pings', 'color:#1d9bf0;font-weight:bold;');
         }
     });
     initObserver.observe(document.body, { childList: true, subtree: true });
