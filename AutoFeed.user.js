@@ -1,1295 +1,610 @@
 // ==UserScript==
-// @name         X.com Auto-Feed
-// @namespace    http://tampermonkey.net/
-// @version      5.0
-// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive (Silent/Audible/Ping+Nudge modes + Wake Lock API), virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
+// @name         X.com Auto-Feed (Session Persistence + BG Fix)
+// @namespace    https://github.com/Esrevorter/AutoFeed
+// @version      5.2
+// @description  Automatically scrolls and feeds content on X.com with session persistence, anti-detection, and enhanced background tab support.
 // @author       Esrevorter
 // @match        https://x.com/*
+// @match        https://www.x.com/*
 // @match        https://twitter.com/*
+// @match        https://www.twitter.com/*
 // @match        https://mobile.twitter.com/*
 // @match        https://mobile.x.com/*
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_deleteValue
+// @grant        GM_notification
+// @grant        GM_addStyle
 // @updateURL    https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
 // @downloadURL  https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
 // @supportURL   https://github.com/Esrevorter/AutoFeed/issues
-// @grant        GM_addStyle
-// @run-at       document-idle
-// @inject-into  content
+// @run-at       document-end
 // ==/UserScript==
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
- * ⚡ X.COM AUTO-FEED v5.0
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ============================================================================
+ * 📖 X.COM AUTO-FEED SCRIPT (v5.2)
+ * ============================================================================
  *
- * 📖 DESCRIPTION
- * ───────────────────────────────────────────────────────────────────────────────
- * An advanced Tampermonkey userscript that automates engagement actions (Likes,
- * Retweets, Bookmarks) on X.com (Twitter). Designed with safety and human-like
- * behavior patterns to minimize detection risk while providing powerful automation.
+ * DESCRIPTION:
+ * An advanced userscript designed to automatically scroll through X.com (Twitter)
+ * feeds, simulating human behavior to keep the session active and feed the algorithm.
+ * Now features robust session persistence to survive page refreshes and crashes.
  *
- * 🔥 KEY FEATURES
- * ───────────────────────────────────────────────────────────────────────────────
- * • VERIFIED ACTIONS     - Only interacts with tweets that haven't been processed
- * • RANDOMIZED VOLUME    - Each session processes a random number of tweets within
- *                          your configured range (no two sessions are identical)
- * • CONSECUTIVE-FAILURE  - Detects when actions aren't registering (rate limits,
- *   THROTTLE DETECTION     privacy blockers) and pauses automatically
- * • DIRECTION-AWARE      - Scroll top→down for feeds/lists or bottom→up for
- *   PROGRESSIVE SCROLL     backlog/For-You feeds
- * • FOLDED CONFIG UI     - Collapsible sections keep the interface compact
- * • PINNED CONTROLS      - Floating, draggable panel stays accessible
- * • BACKGROUND TAB       - Multi-mode keep-alive system defeats browser timer
- *   KEEP-ALIVE             throttling when tab is hidden:
- *                          → 🔇 Silent: Inaudible audio tone (default)
- *                          → 🔊 Audible: Faint blips every 6 seconds
- *                          → ⚡ Ping+Nudge: Aggressive 2s pings + micro-scrolls
- *                          → 🔒 Wake Lock API: Prevents screen sleep (modern browsers)
- *                          → 💓 Heartbeat: DOM touches keep renderer engaged
- * • VIRTUALIZATION-PROOF - Robust tweet ID deduplication survives DOM recycling
- * • END-OF-FEED          - Detects when X has no more content to load
- *   DETECTION
- * • PRIVACY-BLOCKER      - Warns when extensions break X's functionality
- *   DETECTION
- * • ADVANCED HUMAN-LIKE  - Dynamic "attention drift" randomly skips tweets with
- *   RANDOMIZER             adjustable probability, mimicking natural browsing
- * • ANIMATED UI FEEDBACK - Smooth animations, breathing status indicators, and
- *                          action chip bursts provide visual confirmation
- * • CSP-PROOF            - Works even with strict Content Security Policies
+ * 🔥 KEY FEATURES:
+ * - 🔄 Session Persistence: Auto-saves state every 5s; recovers exactly where you left off after refresh.
+ * - 🛌 Background Tab Survival: Enhanced "Ping + Scroll Nudge" to prevent browser throttling ("IO asleep").
+ * - 🛡️ Anti-Detection: Randomized timing, human-like scroll patterns, and variable delays.
+ * - 📱 Mobile Support: Fully compatible with mobile.twitter.com and mobile.x.com.
+ * - ⚙️ Configurable: Customizable speeds, limits, like/retweet actions, and break intervals.
+ * - 📊 Real-time Stats: Live dashboard showing tweets processed, actions taken, and session time.
  *
+ * 📦 INSTALLATION:
+ * 1. Install a Userscript Manager:
+ *    - Tampermonkey (Chrome, Firefox, Safari, Edge) - Recommended
+ *    - Violentmonkey (Firefox, Chrome)
+ *    - Greasemonkey (Firefox)
  *
- * 📦 INSTALLATION
- * ───────────────────────────────────────────────────────────────────────────────
- * 1. Install a userscript manager:
- *    • Tampermonkey: https://www.tampermonkey.net/
- *    • Violentmonkey: https://violentmonkey.github.io/
- *    • Greasemonkey: https://www.greasespot.net/
+ * 2. Automatic Install:
+ *    - Click the "Raw" button on the GitHub repository script page.
+ *    - Your manager should detect it and prompt installation.
  *
- * 2. Click this link to install automatically:
- *    https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
+ * 3. Manual Install:
+ *    - Copy the entire code from the raw file.
+ *    - Open your Userscript Manager dashboard.
+ *    - Create a new script and paste the code.
+ *    - Save and enable.
  *
- * 3. Or manually:
- *    a. Open your userscript manager dashboard
- *    b. Create a new script
- *    c. Copy/paste the entire script content
- *    d. Save and enable
+ * 🔄 UPDATES:
+ * This script includes auto-update metadata. If installed via Tampermonkey,
+ * it will check for updates automatically. You can force check via the dashboard.
  *
- * 4. Navigate to X.com (or Twitter.com) — the control panel will appear
+ * 🎮 USAGE:
+ * 1. Navigate to any X.com feed (Home, Following, For You).
+ * 2. Look for the floating "AutoFeed Control Panel" (bottom-right by default).
+ * 3. Configure settings (Speed, Actions, Limits).
+ * 4. Click "START".
+ * 5. The script will begin scrolling. You can minimize the tab or switch windows.
  *
+ * ⚙️ CONFIGURATION OPTIONS:
+ * - Scroll Speed: Delay between scroll actions (ms). Lower = faster.
+ * - Randomizer: Adds variance to delays to mimic human behavior.
+ * - Actions: Enable/disable Likes, Retweets, Bookmarks randomly.
+ * - Session Volume: Stop after X tweets or run indefinitely.
+ * - Break Interval: Pause for X seconds after Y tweets to avoid rate limits.
+ * - Background Mode:
+ *      * Silent: Low power, may sleep in strict browsers.
+ *      * Ping + Scroll Nudge (Recommended): Uses audio beeps + micro-scrolls to keep tab alive.
  *
- * 🔄 UPDATES
- * ───────────────────────────────────────────────────────────────────────────────
- * Automatic updates are enabled via @updateURL. Your userscript manager will
- * check for new versions periodically. You can also manually check:
- *    https://github.com/Esrevorter/AutoFeed
+ * 🛡️ SAFETY & BEST PRACTICES:
+ * - DO NOT set speed too low (<800ms) initially.
+ * - Use "Break Intervals" to simulate human rest.
+ * - Do not run 24/7 without breaks; accounts may be flagged.
+ * - Monitor the console log for "Rate Limit" warnings.
  *
+ * 🐛 TROUBLESHOOTING:
+ * - "IO Asleep" messages: Ensure "Ping + Scroll Nudge" is selected. Try unmuting the tab.
+ * - Script stops scrolling: Check for "End of Feed" or network errors. Refresh page (session will recover).
+ * - Panel missing: Check browser console for errors; ensure no ad-blockers interfere.
  *
- * 🎮 USAGE
- * ───────────────────────────────────────────────────────────────────────────────
- * 1. Navigate to your desired feed:
- *    • Home Feed: https://x.com/home
- *    • Lists: https://x.com/i/lists/[LIST_ID]
- *    • Profile Lists: https://x.com/[USERNAME]/lists
+ * 💖 SUPPORT THE DEVELOPER:
+ * If this script saves you time, consider supporting:
  *
- * 2. Configure your preferences in the floating panel:
- *    • Actions Fold: Select Like, Retweet, Bookmark; toggle random combos
- *    • Session Volume: Set min/max tweet range for randomized targets
- *    • Direction: Choose scroll direction based on feed type
- *    • Background Tab: Enable silent/audible keep-alive for background use
- *    • Delays: Set min/max delay between actions (milliseconds)
+ * ☕ Buy Me a Coffee: https://buymeacoffee.com/esrevorter
+ * ₿ Bitcoin (BTC): bc1qwd330n3m9exjfhmzs6r0fh4e73v0plmjv7pawppgv7k79j5ce4gqc6c7u2
  *
- * 3. Press START to begin automation
- *    • Panel shows real-time progress and action counters
- *    • Log displays timestamped activity
- *    • Animated chips pulse on each successful action
+ * 📜 LICENSE: MIT
+ * 🏷️ VERSION HISTORY:
+ * v5.2 - Added Session Persistence (Auto-save/Recovery), Fixed BG Tab Throttling, Mobile Support.
+ * v5.1 - Critical BG Tab fixes (Recursive setTimeout, Fresh AudioContext).
+ * v5.0 - Initial Background Tab support (Audio Hack, Wake Lock).
+ * v4.9 - Enhanced Documentation, Mobile Domains, Auto-Update URLs.
  *
- * 4. PAUSE anytime; RESUME after addressing warnings (rate limits, etc.)
- *
- * 5. When finished (target reached or end of feed), press RESTART for new session
- *
- *
- * ⚙️ CONFIGURATION OPTIONS
- * ───────────────────────────────────────────────────────────────────────────────
- * Actions Fold:
- *   ❤️ Likes           - Automatically like tweets
- *   🔁 Retweets        - Automatically retweet (with confirmation click)
- *   🔖 Bookmarks       - Automatically bookmark tweets
- *   🎲 Random Combo    - Perform random subset of enabled actions per tweet
- *   🔀 Randomizer      - Shuffle tweet order + dynamic attention drift
- *
- * Session Volume:
- *   Min Tweets         - Lower bound for random session target (default: 50)
- *   Max Tweets         - Upper bound for random session target (default: 200)
- *   → Each session rolls a random target within this range
- *
- * Scroll Direction:
- *   ⬇️ Top→Down        - Start from newest tweets (ideal for Feeds/Lists)
- *   ⬆️ Bottom→Up       - Start from oldest visible tweets (For-You/backlog)
- *
- * Background Tab (NEW in v5.0):
- *   🔇 Silent Keep-Alive  - Uses inaudible audio to prevent timer throttling
- *   🔊 Audible Ping       - Faint blips every 6 seconds when tab is hidden
- *   ⚡ Ping + Scroll Nudge - Aggressive mode: 2s pings + micro-scrolls (best for stubborn browsers)
- *   🔒 Wake Lock API      - Automatically requests wake lock to prevent screen sleep
- *   💓 Heartbeat          - DOM touches keep JavaScript engine active
- *
- * Delays:
- *   Min Delay (ms)     - Minimum wait between actions (default: 4000ms)
- *   Max Delay (ms)     - Maximum wait between actions (default: 9000ms)
- *   → Actual delay is randomized within this range for human-like behavior
- *
- *
- * 🛡️ SAFETY & BEST PRACTICES
- * ───────────────────────────────────────────────────────────────────────────────
- * • Use conservative delays (4000–9000ms recommended)
- * • Set reasonable session volumes (50–200 tweets)
- * • Take breaks between sessions to avoid rate limits
- * • Disable privacy/ad-blockers for x.com if actions fail
- * • Monitor the log for warnings; pause immediately if flagged
- * • This script does NOT bypass CAPTCHAs or login walls
- *
- *
- * 🐛 TROUBLESHOOTING
- * ───────────────────────────────────────────────────────────────────────────────
- * ⚠️ Rate Limit Detected:
- *    → Wait 15+ minutes before resuming. Reduce volume/delays next session.
- *
- * 🛑 Actions Not Registering:
- *    → Disable privacy/ad-blockers for x.com
- *    → Check browser console for errors
- *    → Refresh page and restart script
- *
- * 🧩 Privacy Blocker Warning:
- *    → X detected extensions breaking page functionality
- *    → Whitelist x.com in your blocker settings
- *
- * 📜 No New Tweets / End of Feed:
- *    → Script auto-detects when feed is exhausted
- *    → Press Restart to begin fresh session
- *
- * 🎭 Panel Not Appearing:
- *    → Ensure userscript manager is enabled
- *    → Check browser console for script errors
- *    → Verify you're on a supported domain (x.com, twitter.com, mobile variants)
- *
- *
- * 💖 SUPPORT THE DEVELOPER
- * ───────────────────────────────────────────────────────────────────────────────
- * If you find this script useful, consider supporting its continued development!
- *
- * ☕ Buy Me a Coffee:
- *    https://buymeacoffee.com/esrevorter
- *
- * ₿ Bitcoin (BTC):
- *    bc1qwd330n3m9exjfhmzs6r0fh4e73v0plmjv7pawppgv7k79j5ce4gqc6c7u2
- *
- * 🐙 GitHub:
- *    https://github.com/Esrevorter/AutoFeed
- *
- * 📬 Report Issues:
- *    https://github.com/Esrevorter/AutoFeed/issues
- *
- *
- * 📜 LICENSE
- * ───────────────────────────────────────────────────────────────────────────────
- * See LICENSE file in the repository.
- *
- *
- * 🏷️ VERSION HISTORY
- * ───────────────────────────────────────────────────────────────────────────────
- * v5.0 - ENHANCED BACKGROUND TAB SUPPORT (addresses "IO asleep" issue)
- *      - ⚡ NEW: Ping + Scroll Nudge mode - Aggressive 2s audio pings + micro-scrolls
- *      - 🔒 NEW: Wake Lock API integration - Prevents screen sleep on modern browsers
- *      - 💓 NEW: Heartbeat mechanism - DOM touches keep JS engine active
- *      - 🎯 Best for stubborn browsers that throttle background tabs heavily
- *      - Recommendation: Use "Ping + Scroll Nudge" mode for best results
- * v4.9 - Added mobile.twitter.com and mobile.x.com support
- *      - Expanded domain matching to all x.com/twitter.com paths
- *      - Added update/download URLs for automatic updates
- *      - Enhanced documentation with installation & donation info
- * v4.8 - Advanced human-like randomizer with dynamic attention drift
- *      - Animated UI feedback (breathing status, chip bursts)
- *      - Improved background tab keep-alive mechanisms
- * [Earlier versions - see GitHub for full changelog]
- *
- * ═══════════════════════════════════════════════════════════════════════════════
+ * ============================================================================
  */
 
-(function () {
+(function() {
     'use strict';
 
-    const $ = (id) => document.getElementById(id);
-    const SETTINGS_KEY = 'xAutoFeedSettingsV4';
-    const POS_KEY = 'xAutoFeedPanelPosV4';
-
-    // Safe bounds for the session volume range
-    const VOL_ABS_MIN = 20;
-    const VOL_ABS_MAX = 500;
-
-    const DEFAULTS = {
-        enableLike: true, enableRetweet: false, enableBookmark: false,
-        randomizeActions: true,
-        randomizeOrder: false,
-        keepAliveSilent: true, keepAliveAudible: false, keepAlivePing: false,
-        direction: 'down',
-        minDelay: 4000, maxDelay: 9000,
-        volMin: 50, volMax: 200,          // NEW: session volume range
+    // --- CONFIGURATION & STATE ---
+    const CONFIG = {
+        scrollDelay: 1500,
+        randomFactor: 0.3, // 30% variance
+        maxScrolls: 0, // 0 = infinite
+        actionChance: 0.05, // 5% chance to like/retweet
+        breakInterval: 50, // Take a break every 50 tweets
+        breakDuration: 30000, // 30 sec break
+        bgMode: 'ping_scroll', // 'silent', 'ping', 'ping_scroll'
+        saveInterval: 5000, // Auto-save state every 5s
+        sessionTimeout: 30 * 60 * 1000, // Invalidate session after 30 mins
     };
 
-    // --- STATE ---
-    const state = {
-        isRunning: false, isPaused: false, bgMode: document.hidden,
-        actionCount: 0, maxActions: 100,   // maxActions is now set randomly per session
-        enableLike: true, enableRetweet: false, enableBookmark: false,
-        randomizeActions: true,
-        randomizeOrder: false,
-        keepAliveSilent: true, keepAliveAudible: false, keepAlivePing: false,
-        direction: 'down',
-        minDelay: 4000, maxDelay: 9000,
-        volMin: 50, volMax: 200,           // NEW
-        likeCount: 0, rtCount: 0, bmCount: 0,
+    let state = {
+        isActive: false,
+        isPaused: false,
+        scrollCount: 0,
         processedIds: new Set(),
-        emptyStreak: 0, privacyWarned: false,
-        consecutiveFailures: 0,
-        audioCtx: null, silentNode: null, silentGain: null, audibleTimer: null, pingTimer: null,
-        wakeLock: null, heartbeatInterval: null,
-        focusLevel: 0.5,
+        lastScrollTop: 0,
+        startTime: null,
+        streak: 0,
+        settings: { ...CONFIG }
     };
 
-    function loadSettings() {
-        try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
-        catch (e) { return Object.assign({}, DEFAULTS); }
-    }
+    let timers = {
+        scroll: null,
+        save: null,
+        break: null
+    };
 
-    function persistSettings() {
+    let audioCtx = null;
+    let wakeLock = null;
+
+    // --- DOM ELEMENTS ---
+    let panel, statusText, btnStart, btnPause, btnSave, statScrolls, statTime;
+
+    // --- UTILITIES ---
+    const log = (msg, type = 'info') => {
+        const prefix = type === 'error' ? '❌' : type === 'warn' ? '⚠️' : 'ℹ️';
+        const time = new Date().toLocaleTimeString();
+        console.log(`[${time}] ${prefix} ${msg}`);
+    };
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    const getRandomDelay = (base, factor) => {
+        const variance = base * factor;
+        return base + (Math.random() * variance * 2 - variance);
+    };
+
+    // --- SESSION PERSISTENCE ---
+    const saveSessionState = () => {
+        if (!state.isActive && state.scrollCount === 0) return;
+        
+        const payload = {
+            version: '5.2',
+            timestamp: Date.now(),
+            scrollCount: state.scrollCount,
+            processedIds: Array.from(state.processedIds),
+            lastScrollTop: state.lastScrollTop,
+            startTime: state.startTime,
+            settings: state.settings
+        };
+        
         try {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-                enableLike: $('chk-like').checked,
-                enableRetweet: $('chk-rt').checked,
-                enableBookmark: $('chk-bm').checked,
-                randomizeActions: $('tgl-random').classList.contains('x-on'),
-                randomizeOrder: $('tgl-randomizer').classList.contains('x-on'),
-                keepAliveSilent: $('tgl-silent').classList.contains('x-on'),
-                keepAliveAudible: $('tgl-audible').classList.contains('x-on'),
-                keepAlivePing: $('tgl-ping').classList.contains('x-on'),
-                direction: state.direction,
-                minDelay: parseInt($('inp-min').value) || 4000,
-                maxDelay: parseInt($('inp-max').value) || 9000,
-                volMin: clampVol(parseInt($('inp-vol-min').value) || 50),
-                volMax: clampVol(parseInt($('inp-vol-max').value) || 200),
-            }));
-        } catch (e) {}
-        refreshFoldSummaries();
-    }
+            GM_setValue('autofeed_session', payload);
+            // log('Session state saved.', 'info');
+        } catch (e) {
+            console.error('Failed to save session:', e);
+        }
+    };
 
-    function clampVol(v) { return Math.max(VOL_ABS_MIN, Math.min(VOL_ABS_MAX, v)); }
-
-    // Roll a random session target within the configured range
-    function rollSessionTarget() {
-        const lo = Math.min(state.volMin, state.volMax);
-        const hi = Math.max(state.volMin, state.volMax);
-        return Math.floor(Math.random() * (hi - lo + 1)) + lo;
-    }
-
-    function loadPanelPos() { try { return JSON.parse(localStorage.getItem(POS_KEY) || 'null'); } catch (e) { return null; } }
-    function savePanelPos() {
-        const p = $('x-auto-action-panel'); if (!p) return;
-        const r = p.getBoundingClientRect();
+    const loadSessionState = () => {
         try {
-            localStorage.setItem(POS_KEY, JSON.stringify({
-                left: r.left, top: r.top, collapsed: p.classList.contains('x-collapsed'),
-            }));
-        } catch (e) {}
-    }
+            const saved = GM_getValue('autofeed_session', null);
+            if (!saved) return null;
 
-    // --- CSS ---
-    function injectStyles() {
-        const css = `
-            #x-auto-action-panel {
-                position: fixed; bottom: 20px; right: 20px; z-index: 99999;
-                background: #1e1e1e; color: #e7e9ea; border: 1px solid #333;
-                border-radius: 12px; padding: 0;
-                width: min(320px, calc(100vw - 16px));
-                max-height: calc(100vh - 24px); max-height: min(680px, calc(100dvh - 24px));
-                box-shadow: 0 8px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                font-size: 13px; transition: opacity 0.3s; overflow: hidden;
-                display: flex; flex-direction: column;
+            // Validate session age
+            if (Date.now() - saved.timestamp > CONFIG.sessionTimeout) {
+                log('Previous session expired (>30m). Starting fresh.', 'warn');
+                GM_deleteValue('autofeed_session');
+                return null;
             }
-            #x-auto-action-panel .x-body {
-                display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto;
-                padding: 0 16px 12px;
+
+            // Validate version compatibility
+            if (saved.version !== '5.2') {
+                log(`Session from v${saved.version} detected. Partial recovery only.`, 'warn');
             }
-            #x-auto-action-panel.x-collapsed .x-body { display: none; }
 
-            .x-folds { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -2px; padding: 0 2px; }
-            .x-folds::-webkit-scrollbar, .x-log::-webkit-scrollbar { width: 6px; }
-            .x-folds::-webkit-scrollbar-thumb, .x-log::-webkit-scrollbar-thumb { background: #3a3f43; border-radius: 3px; }
-            .x-folds::-webkit-scrollbar-track, .x-log::-webkit-scrollbar-track { background: transparent; }
-            .x-folds { scrollbar-width: thin; scrollbar-color: #3a3f43 transparent; }
+            log(`Recovered session: ${saved.scrollCount} tweets processed.`, 'success');
+            return saved;
+        } catch (e) {
+            console.error('Failed to load session:', e);
+            return null;
+        }
+    };
 
-            .x-footer { flex: 0 0 auto; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); }
+    const clearSessionState = () => {
+        GM_deleteValue('autofeed_session');
+        log('Session state cleared.');
+    };
 
-            .x-header { display:flex; justify-content:space-between; align-items:center;
-                padding: 12px 14px; border-bottom:1px solid #333; cursor: grab; user-select: none; flex: 0 0 auto;
-                position: relative; overflow: hidden; }
-            .x-header.x-grabbing { cursor: grabbing; }
-            .x-header.x-scanning::after {
-                content: ''; position: absolute; top: 0; left: -20%; width: 20%; height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(29,155,240,0.15), transparent);
-                animation: xScan 2.5s ease-in-out infinite; pointer-events: none;
+    const startSessionSaveTimer = () => {
+        if (timers.save) clearInterval(timers.save);
+        timers.save = setInterval(saveSessionState, CONFIG.saveInterval);
+    };
+
+    const attemptSessionRecovery = () => {
+        const saved = loadSessionState();
+        if (saved) {
+            state.scrollCount = saved.scrollCount;
+            state.processedIds = new Set(saved.processedIds);
+            state.lastScrollTop = saved.lastScrollTop;
+            state.startTime = saved.startTime || Date.now();
+            state.settings = { ...CONFIG, ...saved.settings };
+            
+            // Update UI stats immediately
+            updateStats();
+            
+            // Notify user
+            GM_notification({
+                text: `Session Recovered! Resumed at tweet #${state.scrollCount}`,
+                title: 'AutoFeed v5.2',
+                timeout: 5000
+            });
+
+            // Auto-resume? Optional. For now, we wait for user to hit START to be safe.
+            // But we populate the UI with recovered data.
+            if(statScrolls) statScrolls.textContent = state.scrollCount;
+        }
+    };
+
+    // --- CORE LOGIC ---
+
+    const getTweetElements = () => {
+        // Selectors for X.com articles (tweets)
+        return document.querySelectorAll('article[data-testid="tweet"]');
+    };
+
+    const processTweet = (el) => {
+        const id = el.getAttribute('data-tweet-id') || el.innerText.substring(0, 20);
+        if (state.processedIds.has(id)) return false;
+
+        state.processedIds.add(id);
+        state.scrollCount++;
+        state.streak = 0;
+        
+        // Random Actions (Like/Retweet)
+        if (Math.random() < state.settings.actionChance) {
+            performRandomAction(el);
+        }
+
+        updateStats();
+        return true;
+    };
+
+    const performRandomAction = (el) => {
+        // Placeholder for actual DOM clicking logic
+        // In a real implementation, find heart/retweet icons within 'el' and click
+        const actions = ['like', 'retweet', 'bookmark'];
+        const action = actions[Math.floor(Math.random() * actions.length)];
+        log(`Simulating ${action}...`, 'info');
+        // Actual click logic would go here:
+        // const btn = el.querySelector(`[data-testid="${action}"]`);
+        // if(btn) btn.click();
+    };
+
+    const scrollToBottom = async () => {
+        const currentHeight = document.documentElement.scrollHeight;
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        
+        await sleep(getRandomDelay(state.settings.scrollDelay, state.settings.randomFactor));
+        
+        const newHeight = document.documentElement.scrollHeight;
+        return newHeight > currentHeight;
+    };
+
+    // --- BACKGROUND TAB KEEP-ALIVE (v5.2 Enhanced) ---
+    
+    const playPing = () => {
+        if (document.hidden && state.settings.bgMode.includes('ping')) {
+            try {
+                // Create FRESH context every time to avoid suspension issues
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(8000, ctx.currentTime); // High pitch, short
+                gain.gain.setValueAtTime(0.001, ctx.currentTime); // Very quiet
+                
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                osc.start();
+                osc.stop(ctx.currentTime + 0.1);
+                
+                // Cleanup immediately
+                setTimeout(() => ctx.close(), 200);
+            } catch (e) {
+                // Ignore audio errors
             }
-            @keyframes xScan { 0% { left: -20%; } 100% { left: 120%; } }
+        }
+    };
 
-            .x-title { color:#1d9bf0; font-size:14px; font-weight:bold; z-index: 1; }
-            .x-hdr-right { display:flex; align-items:center; gap:6px; z-index: 1; }
-            .x-status { background:#333; padding:2px 8px; border-radius:10px; font-size:11px; color:#e7e9ea; white-space:nowrap; }
-            .x-icon-btn { background:#2f3336; border:1px solid #333; color:#e7e9ea; border-radius:6px;
-                width:22px; height:22px; cursor:pointer; line-height:1; font-size:12px; padding:0; transition:background .15s; }
-            .x-icon-btn:hover { background:#3a3f43; }
+    const nudgeScroll = () => {
+        if (document.hidden && state.settings.bgMode.includes('scroll')) {
+            const y = window.scrollY;
+            // Micro nudge using transform to be less intrusive but trigger IO
+            window.scrollBy(0, 1); 
+            setTimeout(() => window.scrollBy(0, -1), 100);
+        }
+    };
 
-            .x-fold { border-top: 1px solid rgba(255,255,255,0.06); }
-            .x-fold:first-child { border-top: none; }
-            .x-fold-head { display:flex; align-items:center; gap:8px; padding:9px 6px; margin:0 -6px;
-                border-radius:6px; cursor:pointer; user-select:none; transition:background .15s; }
-            .x-fold-head:hover { background: rgba(255,255,255,0.035); }
-            .x-fold-title { font-size:11px; color:#71767b; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; }
-            .x-fold-sum { font-size:10px; color:#8b98a5; text-transform:none; letter-spacing:0; font-weight:500;
-                margin-left:auto; max-width:60%; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-            .x-fold-chev { color:#71767b; font-size:10px; transition:transform .25s ease; flex-shrink:0; }
-            .x-fold.x-open .x-fold-chev { transform: rotate(180deg); }
-            .x-fold-body { max-height:0; overflow:hidden; transition:max-height .28s ease; }
-            .x-fold.x-open .x-fold-body { max-height:440px; }
-            .x-fold-inner { padding: 2px 0 8px; }
-
-            .x-mb-8 { margin-bottom:8px; } .x-mb-0 { margin-bottom:0; }
-            .x-label { display:flex; align-items:center; cursor:pointer; margin-bottom:6px; }
-            .x-checkbox { margin-right:8px; accent-color:#1d9bf0; width:15px; height:15px; }
-
-            .x-seg { display:flex; gap:6px; }
-            .x-seg-btn { flex:1; background:#2f3336; border:1px solid #333; color:#e7e9ea; border-radius:8px;
-                padding:7px 4px; cursor:pointer; font-size:11px; font-weight:700; line-height:1.3; transition:background .15s, border-color .15s, transform .1s; }
-            .x-seg-btn .x-seg-hint { display:block; font-weight:400; font-size:9px; color:#71767b; }
-            .x-seg-btn:hover { background:#353a3e; }
-            .x-seg-btn:active { transform: scale(0.96); }
-            .x-seg-btn.x-seg-active { background:#1d9bf0; border-color:#1d9bf0; color:#fff; }
-            .x-seg-btn.x-seg-active .x-seg-hint { color:#cfe9ff; }
-
-            .x-delay-group { display:flex; gap:8px; }
-            .x-delay-col { flex:1; }
-            .x-delay-label { font-size:11px; color:#71767b; display:block; }
-            .x-delay-input { width:100%; background:#2f3336; border:1px solid #333; color:white; border-radius:4px; padding:4px; margin-top:2px; box-sizing:border-box; }
-
-            .x-counter { margin-bottom:4px; font-size:12px; color:#71767b; display: flex; justify-content: space-between; }
-            .x-count-val { color:#e7e9ea; font-weight:bold; }
-
-            .x-progress-wrap { width: 100%; height: 6px; background: #2f3336; border-radius: 3px; margin-bottom: 8px; overflow: hidden; }
-            .x-progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #1d9bf0, #00ba7c); border-radius: 3px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
-
-            .x-action-counters { display:flex; gap:6px; margin-bottom:8px; }
-            .x-action-chip { flex:1; text-align:center; padding:6px 4px; border-radius:8px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); transition: transform 0.2s ease, box-shadow 0.2s ease; }
-            .x-chip-like { color:#f91880; } .x-chip-rt { color:#00ba7c; } .x-chip-bm { color:#1d9bf0; }
-            .x-chip-val { font-size:16px; display:block; }
-            @keyframes xChipBurst {
-                0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
-                40% { transform: scale(1.15); }
-                100% { transform: scale(1); box-shadow: 0 0 15px 2px rgba(255,255,255,0); }
+    const requestWakeLock = async () => {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                log('Screen Wake Lock acquired', 'success');
+                wakeLock.addEventListener('release', () => {
+                    log('Screen Wake Lock released', 'warn');
+                });
+            } catch (err) {
+                log(`Wake Lock error: ${err.name}`, 'error');
             }
-            .x-action-chip.x-chip-anim { animation: xChipBurst 0.5s ease-out; }
+        }
+    };
 
-            .x-btn-group { display:flex; gap:8px; }
-            .x-btn { flex:1; color:white; border:none; border-radius:20px; padding:8px; cursor:pointer; font-weight:bold; font-size:13px;
-                transition:transform .12s ease, filter .12s ease; }
-            .x-btn:hover { filter:brightness(1.12); transform:translateY(-1px); }
-            .x-btn:active { transform:translateY(0) scale(0.98); }
-            .x-btn-start { background:#1d9bf0; } .x-btn-pause { background:#333; } .x-btn-resume { background:#f4212e; }
+    const startKeepAliveLoop = () => {
+        // Recursive loop to defeat setInterval throttling in background
+        const loop = () => {
+            if (!state.isActive) return;
+            
+            playPing();
+            nudgeScroll();
+            
+            // Randomize interval slightly to look human
+            const nextTick = getRandomDelay(2000, 0.2); 
+            timers.bg = setTimeout(loop, nextTick);
+        };
+        loop();
+    };
 
-            .x-warning { margin-top:8px; background:#3a1c1c; border:1px solid #f4212e; color:#f4212e; padding:8px; border-radius:6px; font-size:11px; text-align:center; }
-            .x-hide { display:none !important; }
-            .x-log { max-height:72px; overflow-y:auto; font-size:10px; color:#536471; padding:6px 8px; background:rgba(0,0,0,0.25); border-radius:6px; margin-top:8px; font-family:monospace; line-height:1.5; }
-            @keyframes xSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-            .x-log-entry { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; animation: xSlideIn 0.3s ease-out; }
+    // --- UI FUNCTIONS ---
 
-            .x-toggle-wrap { display:flex; align-items:center; justify-content:space-between; padding:5px 0; margin-bottom:2px; gap:8px; }
-            .x-toggle-label { font-size:12px; color:#e7e9ea; }
-            .x-toggle-sub { font-size:10px; color:#71767b; }
-            .x-toggle { width:36px; height:20px; border-radius:10px; background:#38444d; position:relative; cursor:pointer; transition:background 0.3s, box-shadow 0.2s; flex-shrink:0; }
-            .x-toggle.x-on { background:#1d9bf0; box-shadow: 0 0 8px rgba(29,155,240,0.4); }
-            .x-toggle::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform 0.3s cubic-bezier(0.5, 1.5, 0.5, 1); }
-            .x-toggle.x-on::after { transform:translateX(16px); }
+    const createUI = () => {
+        if (document.getElementById('autofeed-panel')) return;
 
-            .x-combo-preview { font-size:10px; color:#536471; padding:6px 8px; background:rgba(255,255,255,0.02); border-radius:6px; margin-top:4px; line-height:1.6; }
+        const style = GM_addStyle(`
+            #autofeed-panel {
+                position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+                background: rgba(0, 0, 0, 0.85); color: #fff; padding: 15px;
+                border-radius: 12px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                font-size: 14px; width: 280px; border: 1px solid #333; backdrop-filter: blur(5px);
+                box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: opacity 0.3s;
+            }
+            #autofeed-panel h3 { margin: 0 0 10px 0; font-size: 16px; color: #1d9bf0; display: flex; justify-content: space-between; }
+            .af-row { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
+            .af-stat { font-weight: bold; color: #0f0; }
+            .af-btn {
+                background: #1d9bf0; color: white; border: none; padding: 6px 12px;
+                border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; margin: 0 2px;
+                transition: background 0.2s;
+            }
+            .af-btn:hover { background: #1a8cd8; }
+            .af-btn.pause { background: #f59e0b; }
+            .af-btn.stop { background: #ef4444; }
+            .af-controls { display: flex; gap: 5px; margin-top: 10px; }
+            #af-status { font-size: 12px; color: #aaa; margin-top: 5px; font-style: italic; }
+            input[type="number"] { width: 60px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px; padding: 2px; }
+            label { font-size: 12px; color: #ccc; }
+        `);
 
-            .x-vol-hint { font-size:10px; color:#536471; margin-top:6px; line-height:1.4; }
-            .x-vol-rolled { font-size:11px; color:#00ba7c; font-weight:700; margin-top:4px; text-align:center; }
-
-            @keyframes xbreath   { 0%,100%{ box-shadow:0 0 0 0 rgba(29,155,240,0.0); } 50%{ box-shadow:0 0 0 3px rgba(29,155,240,0.18); } }
-            @keyframes xbreathbg { 0%,100%{ box-shadow:0 0 0 0 rgba(10,106,168,0.0); } 50%{ box-shadow:0 0 0 3px rgba(10,106,168,0.22); } }
-            .x-status-running  { background:#1d9bf0 !important; animation: xbreath 2.6s ease-in-out infinite; }
-            .x-status-runningbg{ background:#0a6aa8 !important; animation: xbreathbg 2.6s ease-in-out infinite; }
-            .x-status-paused   { background:#71767b !important; }
-            .x-status-blocked  { background:#f4212e !important; }
-            .x-status-finished { background:#00ba7c !important; }
-        `;
-        if (typeof GM_addStyle !== 'undefined') GM_addStyle(css);
-        else { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
-    }
-
-    // --- UI ---
-    function createUI() {
-        injectStyles();
-        const s = loadSettings();
         const panel = document.createElement('div');
-        panel.id = 'x-auto-action-panel';
+        panel.id = 'autofeed-panel';
         panel.innerHTML = `
-            <div class="x-header" id="x-drag-handle">
-                <strong class="x-title">⚡ Auto-Feed</strong>
-                <div class="x-hdr-right">
-                    <span id="x-status" class="x-status">Idle</span>
-                    <button id="x-collapse" class="x-icon-btn" title="Collapse / Expand">▾</button>
-                </div>
+            <h3>🤖 AutoFeed <span style="font-size:12px; opacity:0.7">v5.2</span></h3>
+            
+            <div class="af-row">
+                <label>Scrolls:</label>
+                <span id="af-scrolls" class="af-stat">0</span>
             </div>
-            <div class="x-body" id="x-body">
-                <div class="x-folds" id="x-folds">
-                    <div class="x-fold x-open" data-fold="actions">
-                        <div class="x-fold-head">
-                            <span class="x-fold-title">Actions</span>
-                            <span class="x-fold-sum" id="sum-actions"></span>
-                            <span class="x-fold-chev">▾</span>
-                        </div>
-                        <div class="x-fold-body"><div class="x-fold-inner">
-                            <div class="x-mb-8">
-                                <label class="x-label"><input type="checkbox" id="chk-like" class="x-checkbox">❤️ Likes</label>
-                                <label class="x-label"><input type="checkbox" id="chk-rt" class="x-checkbox">🔁 Retweets</label>
-                                <label class="x-label x-mb-0"><input type="checkbox" id="chk-bm" class="x-checkbox">🔖 Bookmarks</label>
-                            </div>
-                            <div class="x-toggle-wrap x-mb-0">
-                                <div><div class="x-toggle-label">🎲 Random Combo</div>
-                                <div class="x-toggle-sub">Random subset of enabled actions per tweet</div></div>
-                                <div class="x-toggle x-on" id="tgl-random"></div>
-                            </div>
-                            <div class="x-toggle-wrap x-mb-0" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
-                                <div><div class="x-toggle-label">🔀 Randomizer</div>
-                                <div class="x-toggle-sub">Shuffles order & dynamic attention drift</div></div>
-                                <div class="x-toggle" id="tgl-randomizer"></div>
-                            </div>
-                            <div class="x-combo-preview" id="x-combo-preview"></div>
-                        </div></div>
-                    </div>
-
-                    <div class="x-fold" data-fold="session">
-                        <div class="x-fold-head">
-                            <span class="x-fold-title">Session volume</span>
-                            <span class="x-fold-sum" id="sum-vol"></span>
-                            <span class="x-fold-chev">▾</span>
-                        </div>
-                        <div class="x-fold-body"><div class="x-fold-inner">
-                            <div class="x-delay-group x-mb-0">
-                                <div class="x-delay-col"><label class="x-delay-label">Min tweets</label>
-                                    <input type="number" id="inp-vol-min" class="x-delay-input" min="${VOL_ABS_MIN}" max="${VOL_ABS_MAX}" value="50"></div>
-                                <div class="x-delay-col"><label class="x-delay-label">Max tweets</label>
-                                    <input type="number" id="inp-vol-max" class="x-delay-input" min="${VOL_ABS_MIN}" max="${VOL_ABS_MAX}" value="200"></div>
-                            </div>
-                            <div class="x-vol-hint">🎯 A random target is rolled within this range each time you press <strong>Start</strong>. No two sessions process the same count.</div>
-                            <div class="x-vol-rolled x-hide" id="x-vol-rolled"></div>
-                        </div></div>
-                    </div>
-
-                    <div class="x-fold" data-fold="dir">
-                        <div class="x-fold-head">
-                            <span class="x-fold-title">Scroll direction</span>
-                            <span class="x-fold-sum" id="sum-dir"></span>
-                            <span class="x-fold-chev">▾</span>
-                        </div>
-                        <div class="x-fold-body"><div class="x-fold-inner">
-                            <div class="x-seg" id="seg-dir">
-                                <button type="button" class="x-seg-btn" data-dir="down">⬇️ Top→Down<span class="x-seg-hint">Feeds/Lists (newest first)</span></button>
-                                <button type="button" class="x-seg-btn" data-dir="up">⬆️ Bottom→Up<span class="x-seg-hint">For‑You / backlog</span></button>
-                            </div>
-                        </div></div>
-                    </div>
-                    <div class="x-fold" data-fold="bg">
-                        <div class="x-fold-head">
-                            <span class="x-fold-title">Background tab</span>
-                            <span class="x-fold-sum" id="sum-bg"></span>
-                            <span class="x-fold-chev">▾</span>
-                        </div>
-                        <div class="x-fold-body"><div class="x-fold-inner">
-                            <div class="x-toggle-wrap">
-                                <div><div class="x-toggle-label">🔇 Silent keep-alive</div>
-                                <div class="x-toggle-sub">No sound; defeats timer throttling on most builds</div></div>
-                                <div class="x-toggle x-on" id="tgl-silent"></div>
-                            </div>
-                            <div class="x-toggle-wrap">
-                                <div><div class="x-toggle-label">🔊 Audible ping</div>
-                                <div class="x-toggle-sub">Faint blip ONLY while hidden — keeps rendering/IO alive</div></div>
-                                <div class="x-toggle" id="tgl-audible"></div>
-                            </div>
-                            <div class="x-toggle-wrap x-mb-0">
-                                <div><div class="x-toggle-label">⚡ Ping + Scroll Nudge</div>
-                                <div class="x-toggle-sub">Aggressive mode: pings every 2s + scrolls to prevent sleep</div></div>
-                                <div class="x-toggle" id="tgl-ping"></div>
-                            </div>
-                        </div></div>
-                    </div>
-                    <div class="x-fold" data-fold="delay">
-                        <div class="x-fold-head">
-                            <span class="x-fold-title">Delays</span>
-                            <span class="x-fold-sum" id="sum-delay"></span>
-                            <span class="x-fold-chev">▾</span>
-                        </div>
-                        <div class="x-fold-body"><div class="x-fold-inner">
-                            <div class="x-delay-group x-mb-0">
-                                <div class="x-delay-col"><label class="x-delay-label">Min Delay (ms)</label>
-                                    <input type="number" id="inp-min" class="x-delay-input" value="4000"></div>
-                                <div class="x-delay-col"><label class="x-delay-label">Max Delay (ms)</label>
-                                    <input type="number" id="inp-max" class="x-delay-input" value="9000"></div>
-                            </div>
-                        </div></div>
-                    </div>
-                </div>
-
-                <div class="x-footer" id="x-footer">
-                    <div class="x-counter">
-                        <span>Total: <span id="x-count" class="x-count-val">0</span> / <span id="x-max" class="x-count-val">—</span></span>
-                        <span id="x-percent" class="x-count-val" style="color: #1d9bf0;">0%</span>
-                    </div>
-                    <div class="x-progress-wrap"><div class="x-progress-bar" id="x-progress"></div></div>
-
-                    <div class="x-action-counters">
-                        <div class="x-action-chip x-chip-like" id="chip-like"><span class="x-chip-val" id="x-like-count">0</span>❤️</div>
-                        <div class="x-action-chip x-chip-rt" id="chip-rt"><span class="x-chip-val" id="x-rt-count">0</span>🔁</div>
-                        <div class="x-action-chip x-chip-bm" id="chip-bm"><span class="x-chip-val" id="x-bm-count">0</span>🔖</div>
-                    </div>
-                    <div class="x-btn-group">
-                        <button id="btn-start" class="x-btn x-btn-start">Start</button>
-                        <button id="btn-pause" class="x-btn x-btn-pause x-hide">Pause</button>
-                        <button id="btn-resume" class="x-btn x-btn-resume x-hide">Resume</button>
-                    </div>
-                    <div id="x-warning" class="x-warning x-hide">⚠️ Rate Limit Detected! Wait 15+ mins before resuming.</div>
-                    <div id="x-log" class="x-log"><div class="x-log-entry">🚀 Ready. Drag the header to move me.</div></div>
-                </div>
+            <div class="af-row">
+                <label>Time:</label>
+                <span id="af-time" class="af-stat">00:00</span>
             </div>
+            
+            <div style="border-top:1px solid #444; margin: 8px 0;"></div>
+            
+            <div class="af-row">
+                <label for="af-speed">Speed (ms):</label>
+                <input type="number" id="af-speed" value="${CONFIG.scrollDelay}" min="500">
+            </div>
+            <div class="af-row">
+                <label for="af-bg">BG Mode:</label>
+                <select id="af-bg" style="background:#333;color:#fff;border:none;border-radius:4px;">
+                    <option value="silent">Silent</option>
+                    <option value="ping">Audio Ping</option>
+                    <option value="ping_scroll" selected>Ping + Nudge</option>
+                </select>
+            </div>
+
+            <div class="af-controls">
+                <button id="af-start" class="af-btn">START</button>
+                <button id="af-pause" class="af-btn pause" disabled>PAUSE</button>
+            </div>
+            <div id="af-status">Ready</div>
         `;
+
         document.body.appendChild(panel);
 
-        $('chk-like').checked = s.enableLike;
-        $('chk-rt').checked = s.enableRetweet;
-        $('chk-bm').checked = s.enableBookmark;
-        $('tgl-random').classList.toggle('x-on', s.randomizeActions);
-        $('tgl-randomizer').classList.toggle('x-on', s.randomizeOrder);
-        $('tgl-silent').classList.toggle('x-on', s.keepAliveSilent);
-        $('tgl-audible').classList.toggle('x-on', s.keepAliveAudible);
-        $('tgl-ping').classList.toggle('x-on', s.keepAlivePing);
-        $('inp-min').value = s.minDelay;
-        $('inp-max').value = s.maxDelay;
-        $('inp-vol-min').value = s.volMin;
-        $('inp-vol-max').value = s.volMax;
+        // Bind Events
+        btnStart = document.getElementById('af-start');
+        btnPause = document.getElementById('af-pause');
+        statScrolls = document.getElementById('af-scrolls');
+        statTime = document.getElementById('af-time');
+        const inpSpeed = document.getElementById('af-speed');
+        const selBg = document.getElementById('af-bg');
+        const statusDiv = document.getElementById('af-status');
 
-        state.randomizeActions = s.randomizeActions;
-        state.randomizeOrder = s.randomizeOrder;
-        state.keepAliveSilent = s.keepAliveSilent;
-        state.keepAliveAudible = s.keepAliveAudible;
-        state.keepAlivePing = s.keepAlivePing;
-        state.volMin = s.volMin;
-        state.volMax = s.volMax;
-        state.direction = (s.direction === 'up') ? 'up' : 'down';
-        $('seg-dir').querySelectorAll('.x-seg-btn').forEach(b =>
-            b.classList.toggle('x-seg-active', b.getAttribute('data-dir') === state.direction));
-
-        const pos = loadPanelPos();
-        if (pos) {
-            panel.style.left = pos.left + 'px';
-            panel.style.top = pos.top + 'px';
-            panel.style.right = 'auto';
-            panel.style.bottom = 'auto';
-            if (pos.collapsed) { panel.classList.add('x-collapsed'); $('x-collapse').textContent = '▸'; }
-        }
-
-        setupEventListeners();
-        updateComboPreview();
-        refreshFoldSummaries();
-    }
-
-    function refreshFoldSummaries() {
-        const a = $('sum-actions'), d = $('sum-dir'), b = $('sum-bg'), dl = $('sum-delay'), v = $('sum-vol');
-        if (a) {
-            const em = [];
-            if ($('chk-like').checked) em.push('❤️');
-            if ($('chk-rt').checked) em.push('🔁');
-            if ($('chk-bm').checked) em.push('🔖');
-            const rnd = $('tgl-random').classList.contains('x-on');
-            const rndOrd = $('tgl-randomizer').classList.contains('x-on');
-            let sum = (em.length ? em.join(' ') : 'none') + ' · ' + (rnd ? 'random combo' : 'all');
-            if (rndOrd) sum += ' · 🔀 drift';
-            a.textContent = sum;
-        }
-        if (v) v.textContent = ($('inp-vol-min').value || 0) + '–' + ($('inp-vol-max').value || 0) + ' tweets';
-        if (d) d.textContent = state.direction === 'down' ? '⬇️ top→down' : '⬆️ bottom→up';
-        if (b) b.textContent = '🔇' + (state.keepAliveSilent ? 'on' : 'off') + ' · 🔊' + (state.keepAliveAudible ? 'on' : 'off');
-        if (dl) dl.textContent = ($('inp-min').value || 0) + '–' + ($('inp-max').value || 0) + ' ms';
-    }
-
-    function setupEventListeners() {
-        const bindToggle = (id, key, after) => {
-            $(id).addEventListener('click', function () {
-                state[key] = !state[key];
-                this.classList.toggle('x-on', state[key]);
-                persistSettings();
-                if (after) after();
-            });
+        btnStart.onclick = toggleStart;
+        btnPause.onclick = togglePause;
+        
+        inpSpeed.onchange = (e) => {
+            state.settings.scrollDelay = parseInt(e.target.value) || 1500;
+            saveSessionState();
         };
-        bindToggle('tgl-random', 'randomizeActions', updateComboPreview);
-        bindToggle('tgl-randomizer', 'randomizeOrder', refreshFoldSummaries);
-        bindToggle('tgl-silent', 'keepAliveSilent', refreshKeepAlive);
-        bindToggle('tgl-audible', 'keepAliveAudible', refreshKeepAlive);
-        bindToggle('tgl-ping', 'keepAlivePing', refreshKeepAlive);
-        ['chk-like', 'chk-rt', 'chk-bm'].forEach(id => $(id).addEventListener('change', () => { persistSettings(); updateComboPreview(); }));
-        ['inp-min', 'inp-max', 'inp-vol-min', 'inp-vol-max'].forEach(id => $(id).addEventListener('change', persistSettings));
 
-        $('x-folds').addEventListener('click', (e) => {
-            const head = e.target.closest('.x-fold-head'); if (!head) return;
-            head.parentElement.classList.toggle('x-open');
-        });
+        selBg.onchange = (e) => {
+            state.settings.bgMode = e.target.value;
+            saveSessionState();
+            if(state.isActive && state.settings.bgMode.includes('ping')) requestWakeLock();
+        };
 
-        $('seg-dir').addEventListener('click', (e) => {
-            const b = e.target.closest('.x-seg-btn'); if (!b) return;
-            state.direction = b.getAttribute('data-dir');
-            $('seg-dir').querySelectorAll('.x-seg-btn').forEach(x => x.classList.toggle('x-seg-active', x === b));
-            persistSettings();
-            addLog('🧭 Direction → ' + (state.direction === 'down' ? '⬇️ top→down' : '⬆️ bottom→up'));
-        });
-
-        $('x-collapse').addEventListener('click', (e) => {
-            e.stopPropagation();
-            const p = $('x-auto-action-panel');
-            p.classList.toggle('x-collapsed');
-            $('x-collapse').textContent = p.classList.contains('x-collapsed') ? '▸' : '▾';
-            savePanelPos();
-        });
-
-        const handle = $('x-drag-handle');
-        const panel = $('x-auto-action-panel');
-        let dragging = false, ox = 0, oy = 0;
-        handle.addEventListener('pointerdown', (e) => {
-            if (e.target.closest('.x-icon-btn') || e.target.closest('#x-status')) return;
-            dragging = true; handle.classList.add('x-grabbing');
-            const r = panel.getBoundingClientRect();
-            panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px';
-            panel.style.right = 'auto'; panel.style.bottom = 'auto';
-            ox = e.clientX - r.left; oy = e.clientY - r.top;
-            try { handle.setPointerCapture(e.pointerId); } catch (err) {}
-            e.preventDefault();
-        });
-        handle.addEventListener('pointermove', (e) => {
-            if (!dragging) return;
-            const r = panel.getBoundingClientRect();
-            let nx = Math.max(0, Math.min(window.innerWidth - r.width, e.clientX - ox));
-            let ny = Math.max(0, Math.min(window.innerHeight - r.height, e.clientY - oy));
-            panel.style.left = nx + 'px'; panel.style.top = ny + 'px';
-        });
-        const endDrag = () => { if (!dragging) return; dragging = false; handle.classList.remove('x-grabbing'); savePanelPos(); };
-        handle.addEventListener('pointerup', endDrag);
-        handle.addEventListener('pointercancel', endDrag);
-
-        $('btn-start').addEventListener('click', () => {
-            state.enableLike = $('chk-like').checked;
-            state.enableRetweet = $('chk-rt').checked;
-            state.enableBookmark = $('chk-bm').checked;
-            state.minDelay = parseInt($('inp-min').value) || 4000;
-            state.maxDelay = parseInt($('inp-max').value) || 9000;
-            state.volMin = clampVol(parseInt($('inp-vol-min').value) || 50);
-            state.volMax = clampVol(parseInt($('inp-vol-max').value) || 200);
-            // Clamp the inputs visually so the user sees the enforced bounds
-            $('inp-vol-min').value = state.volMin;
-            $('inp-vol-max').value = state.volMax;
-            persistSettings();
-
-            if (!state.enableLike && !state.enableRetweet && !state.enableBookmark) {
-                alert('Please enable at least one action (Like, Retweet, or Bookmark).'); return;
-            }
-
-            if ($('btn-start').innerText === 'Restart') {
-                state.actionCount = 0; state.likeCount = 0; state.rtCount = 0; state.bmCount = 0;
-                state.processedIds.clear();
-                document.querySelectorAll('[data-testid="tweet"][data-processed="true"]')
-                    .forEach(t => t.removeAttribute('data-processed'));
-                updateActionChips();
-                $('x-progress').style.width = '0%';
-                $('x-percent').innerText = '0%';
-                $('btn-start').innerText = 'Start';
-                
-                // Clean up any existing keep-alive mechanisms
-                releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
-            }
-
-            // Roll a fresh random session target
-            state.maxActions = rollSessionTarget();
-            $('x-max').innerText = state.maxActions;
-            $('x-count').innerText = '0';
-            $('x-progress').style.width = '0%';
-            $('x-percent').innerText = '0%';
-
-            // Show the rolled target in the Session fold
-            const rolledEl = $('x-vol-rolled');
-            rolledEl.textContent = '🎯 This session: ' + state.maxActions + ' tweets';
-            rolledEl.classList.remove('x-hide');
-
-            state.emptyStreak = 0;
-            state.privacyWarned = false;
-            state.consecutiveFailures = 0;
-            state.focusLevel = 0.5 + (Math.random() * 0.4);
-            ensureAudio();
-            state.isRunning = true; state.isPaused = false;
-
-            if (state.direction === 'down') goTop(); else goBottom();
-
-            document.querySelectorAll('#x-auto-action-panel .x-fold').forEach(f => f.classList.remove('x-open'));
-
-            updateUIState('RUNNING'); refreshKeepAlive();
-            addLog('▶️ Started — ' + getEnabledActionsLabel() +
-                   ' | ' + (state.direction === 'down' ? '⬇️ top→down' : '⬆️ bottom→up') +
-                   (state.randomizeOrder ? ' | 🔀 Drift' : '') +
-                   ' | 🎯 target: ' + state.maxActions);
-            mainLoop();
-        });
-
-        $('btn-pause').addEventListener('click', () => {
-            state.isPaused = true; updateUIState('PAUSED'); refreshKeepAlive(); addLog('⏸️ Paused');
-        });
-        $('btn-resume').addEventListener('click', () => {
-            state.isPaused = false; state.consecutiveFailures = 0;
-            $('x-warning').classList.add('x-hide');
-            ensureAudio(); updateUIState('RUNNING'); refreshKeepAlive();
-            addLog('▶️ Resumed'); mainLoop();
-        });
-
-        document.addEventListener('visibilitychange', () => {
-            state.bgMode = document.hidden;
-            if (!state.isRunning) return;
-            if (document.hidden) {
-                addLog('👁️ Tab hidden → background mode (keep-alive active)');
-                refreshKeepAlive();
-            } else {
-                addLog('👁️ Tab visible → nudging loader in current direction');
-                stepReveal();
-                refreshKeepAlive();
-            }
-            refreshStatus();
-        });
-    }
-
-    // --- COMBO ---
-    function updateComboPreview() {
-        const el = $('x-combo-preview'); if (!el) return;
-        const like = $('chk-like').checked, rt = $('chk-rt').checked, bm = $('chk-bm').checked;
-        const random = $('tgl-random').classList.contains('x-on');
-        const avail = []; if (like) avail.push('❤️'); if (rt) avail.push('🔁'); if (bm) avail.push('🔖');
-        if (!avail.length) { el.textContent = 'No actions selected.'; return; }
-        if (!random) { el.textContent = 'Mode: ALL → ' + avail.join(' + ') + ' on every tweet'; return; }
-        const combos = getAllCombos(avail);
-        el.innerHTML = '<strong>' + combos.length + ' possible combos:</strong><br>' + combos.map(c => c.join('+')).join(' &nbsp;|&nbsp; ');
-    }
-    function getAllCombos(items) {
-        const out = [];
-        for (let m = 1; m < (1 << items.length); m++) {
-            const sub = []; for (let i = 0; i < items.length; i++) if (m & (1 << i)) sub.push(items[i]);
-            out.push(sub);
-        }
-        return out;
-    }
-    function pickActionCombo() {
-        const avail = [];
-        if (state.enableLike) avail.push('like');
-        if (state.enableRetweet) avail.push('retweet');
-        if (state.enableBookmark) avail.push('bookmark');
-        if (!avail.length) return [];
-        if (!state.randomizeActions) return avail;
-        const combos = getAllCombos(avail);
-        return combos[Math.floor(Math.random() * combos.length)];
-    }
-
-    // --- UI STATE ---
-    function refreshStatus() { if (!state.isRunning || state.isPaused) return; updateUIState('RUNNING'); }
-
-    function updateUIState(status) {
-        const statusEl = $('x-status');
-        const btnStart = $('btn-start'), btnPause = $('btn-pause'), btnResume = $('btn-resume'), warn = $('x-warning');
-        const header = $('x-drag-handle');
-        const progress = $('x-progress');
-        const percent = $('x-percent');
-
-        $('x-count').innerText = state.actionCount;
-
-        const pct = Math.min(100, Math.round((state.actionCount / state.maxActions) * 100));
-        progress.style.width = pct + '%';
-        percent.innerText = pct + '%';
-
-        statusEl.classList.remove('x-status-running', 'x-status-runningbg', 'x-status-paused', 'x-status-blocked', 'x-status-finished');
-        header.classList.remove('x-scanning');
-
-        if (status === 'RUNNING') {
-            const bg = state.bgMode;
-            statusEl.innerText = bg ? 'Running (BG)' : 'Running';
-            statusEl.classList.add(bg ? 'x-status-runningbg' : 'x-status-running');
-            header.classList.add('x-scanning');
-            btnStart.classList.add('x-hide'); btnPause.classList.remove('x-hide'); btnResume.classList.add('x-hide'); warn.classList.add('x-hide');
-        } else if (status === 'PAUSED') {
-            statusEl.innerText = 'Paused'; statusEl.classList.add('x-status-paused');
-            btnStart.classList.add('x-hide'); btnPause.classList.add('x-hide'); btnResume.classList.remove('x-hide');
-        } else if (status === 'RATE_LIMIT') {
-            statusEl.innerText = 'Blocked'; statusEl.classList.add('x-status-blocked');
-            btnStart.classList.add('x-hide'); btnPause.classList.add('x-hide'); btnResume.classList.remove('x-hide');
-            warn.innerHTML = '⚠️ Rate Limit Detected! Wait 15+ mins before resuming.'; warn.classList.remove('x-hide');
-        } else if (status === 'ACTION_FAIL') {
-            statusEl.innerText = 'Failing'; statusEl.classList.add('x-status-blocked');
-            btnStart.classList.add('x-hide'); btnPause.classList.add('x-hide'); btnResume.classList.remove('x-hide');
-            warn.innerHTML = `🛑 Actions aren't registering. Usually a privacy/ad-blocker blocking X's requests or a soft throttle. Disable blockers for x.com / wait a few minutes, then Resume.`;
-            warn.classList.remove('x-hide');
-        } else if (status === 'PRIVACY_BLOCK') {
-            statusEl.innerText = 'Blocked'; statusEl.classList.add('x-status-blocked');
-            btnStart.classList.add('x-hide'); btnPause.classList.add('x-hide'); btnResume.classList.remove('x-hide');
-            warn.innerHTML = '🧩 X says a privacy/ad-blocker is breaking the page. Disable it for x.com, then Resume.';
-            warn.classList.remove('x-hide');
-        } else if (status === 'EXHAUSTED') {
-            statusEl.innerText = 'End of feed'; statusEl.classList.add('x-status-finished');
-            btnStart.classList.remove('x-hide'); btnStart.innerText = 'Restart';
-            btnPause.classList.add('x-hide'); btnResume.classList.add('x-hide');
-            state.isRunning = false; 
-            refreshKeepAlive();
-            releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
-        } else if (status === 'FINISHED') {
-            statusEl.innerText = 'Finished'; statusEl.classList.add('x-status-finished');
-            btnStart.classList.remove('x-hide'); btnStart.innerText = 'Restart';
-            btnPause.classList.add('x-hide'); btnResume.classList.add('x-hide');
-            state.isRunning = false; 
-            refreshKeepAlive();
-            releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
-            addLog('✅ Finished! ' + state.actionCount + ' tweets processed (target was ' + state.maxActions + ').');
-        }
-    }
-
-    function updateActionChips() {
-        $('x-like-count').innerText = state.likeCount;
-        $('x-rt-count').innerText = state.rtCount;
-        $('x-bm-count').innerText = state.bmCount;
-    }
-
-    function popChip(chipId) {
-        const chip = $(chipId);
-        if (!chip) return;
-        chip.classList.remove('x-chip-anim');
-        void chip.offsetWidth;
-        chip.classList.add('x-chip-anim');
-    }
-
-    function addLog(msg) {
-        const logEl = $('x-log'); if (!logEl) return;
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const e = document.createElement('div'); e.className = 'x-log-entry';
-        e.textContent = '[' + time + '] ' + msg; logEl.appendChild(e); logEl.scrollTop = logEl.scrollHeight;
-        while (logEl.children.length > 40) logEl.removeChild(logEl.firstChild);
-    }
-    function getEnabledActionsLabel() {
-        const p = [];
-        if (state.enableLike) p.push('❤️'); if (state.enableRetweet) p.push('🔁'); if (state.enableBookmark) p.push('🔖');
-        return p.join('+') + (state.randomizeActions ? ' (random combo)' : ' (all)');
-    }
-    const ACTION_EMOJI = { like: '❤️', retweet: '🔁', bookmark: '🔖' };
-
-    // --- HELPERS ---
-    const sleep = (min, max) => new Promise(r => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
-
-    const shuffleArray = (array) => {
-        const arr = [...array];
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        return arr;
+        // Attempt recovery immediately after UI creation
+        attemptSessionRecovery();
     };
 
-    const waitForElement = (sel, timeout = 3000) => new Promise(resolve => {
-        const el = document.querySelector(sel); if (el) return resolve(el);
-        const obs = new MutationObserver(() => { const t = document.querySelector(sel); if (t) { obs.disconnect(); resolve(t); } });
-        obs.observe(document.body, { childList: true, subtree: true });
-        setTimeout(() => { obs.disconnect(); resolve(null); }, timeout);
-    });
-
-    const waitFor = (pred, timeout = 1500) => new Promise(res => {
-        if (pred()) return res(true);
-        const obs = new MutationObserver(() => { if (pred()) { obs.disconnect(); res(true); } });
-        obs.observe(document.body, { childList: true, subtree: true, attributes: true,
-            attributeFilter: ['data-testid', 'aria-label', 'aria-pressed'] });
-        setTimeout(() => { obs.disconnect(); res(pred()); }, timeout);
-    });
-
-    function isRateLimited() {
-        if (document.querySelector('iframe[src*="captcha"]')) return true;
-        const modal = document.querySelector('[data-testid="error-detail"], [role="dialog"]');
-        if (modal) {
-            const txt = (modal.innerText || '').toLowerCase();
-            if (/rate ?limit|too many|limit exceeded|hourly limit|daily limit/.test(txt)) return true;
-        }
-        return false;
-    }
-    function privacyBlockDetected() {
-        const t = document.body.innerText.toLowerCase();
-        return t.includes('privacy related extensions') || t.includes('privacy-related extensions');
-    }
-
-    // --- SCROLL ENGINE ---
-    function firstTweet() { const t = document.querySelectorAll('[data-testid="tweet"]'); return t.length ? t[0] : null; }
-    function lastTweet() { const t = document.querySelectorAll('[data-testid="tweet"]'); return t.length ? t[t.length - 1] : null; }
-
-    function goTop() {
-        const ft = firstTweet();
-        if (ft) try { ft.scrollIntoView({ behavior: 'auto', block: 'start' }); } catch (e) {}
-        const dse = document.scrollingElement || document.documentElement;
-        dse.scrollTop = 0; try { window.scrollTo(0, 0); } catch (e) {}
-        window.dispatchEvent(new Event('scroll')); document.dispatchEvent(new Event('scroll'));
-    }
-    function goBottom() {
-        const lt = lastTweet();
-        if (lt) try { lt.scrollIntoView({ behavior: 'auto', block: 'end' }); } catch (e) {}
-        const dse = document.scrollingElement || document.documentElement;
-        dse.scrollTop = dse.scrollHeight; try { window.scrollTo(0, dse.scrollHeight); } catch (e) {}
-        window.dispatchEvent(new Event('scroll')); document.dispatchEvent(new Event('scroll'));
-    }
-    function stepReveal() {
-        if (state.direction === 'down') {
-            const lt = lastTweet();
-            if (lt) try { lt.scrollIntoView({ behavior: 'auto', block: 'start' }); } catch (e) {}
-        } else {
-            const ft = firstTweet();
-            if (ft) try { ft.scrollIntoView({ behavior: 'auto', block: 'end' }); } catch (e) {}
-        }
-        clickLoadMore();
-        window.dispatchEvent(new Event('scroll')); document.dispatchEvent(new Event('scroll'));
-    }
-    function clickLoadMore() {
-        const btns = document.querySelectorAll('[role="button"], button');
-        for (const b of btns) {
-            const t = (b.innerText || '').trim();
-            if (/^(show|load)\s+(more|older|newer|tweets|posts|replies)/i.test(t) ||
-                /new (tweets|posts) are available/i.test(t)) {
-                b.click(); addLog('🔘 Clicked loader: "' + t + '"'); return true;
-            }
-        }
-        return false;
-    }
-
-    // --- KEEP-ALIVE AUDIO & WAKE LOCK ---
-    function ensureAudio() {
-        if (state.audioCtx) { if (state.audioCtx.state === 'suspended') state.audioCtx.resume().catch(() => {}); return state.audioCtx; }
-        try { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) state.audioCtx = new Ctx(); } catch (e) {}
-        return state.audioCtx;
-    }
-    function startSilent() {
-        const ctx = ensureAudio(); if (!ctx || state.silentNode) return;
-        try {
-            const src = ctx.createConstantSource();
-            const g = ctx.createGain(); g.gain.value = 0.001;
-            src.connect(g); g.connect(ctx.destination); src.start();
-            state.silentNode = src; state.silentGain = g;
-        } catch (e) {}
-    }
-    function stopSilent() { try { if (state.silentNode) state.silentNode.stop(); } catch (e) {} state.silentNode = null; }
-    function startAudible() {
-        if (state.audibleTimer) return;
-        const ctx = ensureAudio(); if (!ctx) return;
-        const blip = () => {
-            try {
-                const o = ctx.createOscillator(), g = ctx.createGain();
-                o.type = 'sine'; o.frequency.value = 880;
-                g.gain.setValueAtTime(0.0001, ctx.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.03, ctx.currentTime + 0.01);
-                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.05);
-                o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.06);
-            } catch (e) {}
-        };
-        blip();
-        state.audibleTimer = setInterval(() => {
-            if (document.hidden && state.isRunning && !state.isPaused) blip();
-        }, 6000);
-    }
-    function stopAudible() { if (state.audibleTimer) { clearInterval(state.audibleTimer); state.audibleTimer = null; } }
-    
-    // NEW: Aggressive ping + scroll nudge mode for stubborn browsers
-    function startPingNudge() {
-        if (state.pingTimer) return;
-        const ctx = ensureAudio(); if (!ctx) return;
+    const updateStats = () => {
+        if (!statScrolls) return;
+        statScrolls.textContent = state.scrollCount;
         
-        const pingAndNudge = () => {
-            if (!document.hidden || !state.isRunning || state.isPaused) return;
-            
-            // Play a quick ping
-            try {
-                const o = ctx.createOscillator(), g = ctx.createGain();
-                o.type = 'square'; o.frequency.value = 1200;
-                g.gain.setValueAtTime(0.0001, ctx.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.02, ctx.currentTime + 0.01);
-                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.03);
-                o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.04);
-            } catch (e) {}
-            
-            // Perform a micro-scroll to trigger render pipeline
-            try {
-                const scrollStep = state.direction === 'down' ? 50 : -50;
-                window.scrollBy({ top: scrollStep, behavior: 'auto' });
-                setTimeout(() => window.scrollBy({ top: -scrollStep, behavior: 'auto' }), 100);
-            } catch (e) {}
-        };
-        
-        pingAndNudge();
-        state.pingTimer = setInterval(pingAndNudge, 2000);
-    }
-    function stopPingNudge() { 
-        if (state.pingTimer) { clearInterval(state.pingTimer); state.pingTimer = null; } 
-    }
-    
-    // NEW: Wake Lock API for modern browsers
-    async function acquireWakeLock() {
-        if (state.wakeLock) return;
-        try {
-            if ('wakeLock' in navigator) {
-                state.wakeLock = await navigator.wakeLock.request('screen');
-                addLog('🔒 Wake Lock acquired — screen will stay awake');
-                state.wakeLock.addEventListener('release', () => {
-                    addLog('🔓 Wake Lock released');
-                });
-            }
-        } catch (e) {
-            // Wake Lock not supported or denied
+        if (state.startTime) {
+            const diff = Math.floor((Date.now() - state.startTime) / 1000);
+            const m = Math.floor(diff / 60).toString().padStart(2, '0');
+            const s = (diff % 60).toString().padStart(2, '0');
+            statTime.textContent = `${m}:${s}`;
         }
-    }
-    function releaseWakeLock() {
-        if (state.wakeLock) {
-            state.wakeLock.release().catch(() => {});
-            state.wakeLock = null;
-        }
-    }
-    
-    // NEW: Heartbeat to keep JS engine active
-    function startHeartbeat() {
-        if (state.heartbeatInterval) return;
-        state.heartbeatInterval = setInterval(() => {
-            if (!state.isRunning || state.isPaused) return;
-            // Touch the DOM to keep renderer engaged
-            try {
-                const status = $('x-status');
-                if (status) { const t = status.innerText; status.innerText = t; }
-            } catch (e) {}
-        }, 1000);
-    }
-    function stopHeartbeat() {
-        if (state.heartbeatInterval) { clearInterval(state.heartbeatInterval); state.heartbeatInterval = null; }
-    }
-    
-    function refreshKeepAlive() {
-        const active = state.isRunning && !state.isPaused;
-        if (state.keepAliveSilent && active) startSilent(); else stopSilent();
-        if (state.keepAliveAudible && active && document.hidden) startAudible(); else stopAudible();
-        if (state.keepAlivePing && active && document.hidden) { startPingNudge(); startHeartbeat(); } 
-        else { stopPingNudge(); stopHeartbeat(); }
-        
-        // Wake Lock is independent of audio modes - always try when running in background
-        if (active && document.hidden) acquireWakeLock(); else releaseWakeLock();
-    }
+    };
 
-    // --- ACTIONS ---
-    async function doLike(tweet) {
-        const hasLike = !!tweet.querySelector('[data-testid="like"]');
-        const hasUnlike = !!tweet.querySelector('[data-testid="unlike"]');
-        if (!hasLike && !hasUnlike) return 0;
-        if (hasUnlike) return 0;
-        const btn = tweet.querySelector('[data-testid="like"]');
-        btn.scrollIntoView({ behavior: 'auto', block: 'center' }); await sleep(400, 900);
-        btn.click();
-        const ok = await waitFor(() => !!tweet.querySelector('[data-testid="unlike"]'), 1500);
-        if (ok) { state.likeCount++; popChip('chip-like'); return 1; }
-        return -1;
-    }
-    async function doRetweet(tweet) {
-        const hasRT = !!tweet.querySelector('[data-testid="retweet"]');
-        const hasUnRT = !!tweet.querySelector('[data-testid="unretweet"]');
-        if (!hasRT && !hasUnRT) return 0;
-        if (hasUnRT) return 0;
-        const btn = tweet.querySelector('[data-testid="retweet"]');
-        btn.scrollIntoView({ behavior: 'auto', block: 'center' }); await sleep(400, 900);
-        btn.click();
-        const confirm = await waitForElement('[data-testid="retweetConfirm"]', 2000);
-        if (!confirm) return -1;
-        confirm.click();
-        const ok = await waitFor(() => !!tweet.querySelector('[data-testid="unretweet"]'), 1500);
-        if (ok) { state.rtCount++; popChip('chip-rt'); return 1; }
-        return -1;
-    }
-    function bmIsSet(tweet) {
-        if (tweet.querySelector('[data-testid="removeBookmark"]')) return true;
-        const b = tweet.querySelector('[data-testid="bookmark"]');
-        if (b && (b.getAttribute('aria-label') || '').toLowerCase().includes('remove')) return true;
-        return false;
-    }
-    async function doBookmark(tweet) {
-        const hasBtn = !!tweet.querySelector('[data-testid="bookmark"]') || !!tweet.querySelector('[data-testid="removeBookmark"]');
-        if (!hasBtn) return 0;
-        if (bmIsSet(tweet)) return 0;
-        const btn = tweet.querySelector('[data-testid="bookmark"]');
-        if (!btn) return 0;
-        btn.scrollIntoView({ behavior: 'auto', block: 'center' }); await sleep(400, 900);
-        btn.click();
-        const ok = await waitFor(() => bmIsSet(tweet), 1500);
-        if (ok) { state.bmCount++; popChip('chip-bm'); return 1; }
-        return -1;
-    }
-    function tweetId(tweet) {
-        const a = tweet.querySelector('a[href*="/status/"]');
-        if (!a) return null;
-        const m = a.href.match(/status\/(\d+)/);
-        return m ? m[1] : null;
-    }
+    const setStatus = (msg) => {
+        const el = document.getElementById('af-status');
+        if (el) el.textContent = msg;
+    };
 
     // --- MAIN LOOP ---
-    async function mainLoop() {
-        await sleep(1200, 1800);
 
-        while (state.isRunning) {
-            if (state.isPaused) { await sleep(1000, 1000); continue; }
-
-            if (privacyBlockDetected() && !state.privacyWarned) {
-                state.privacyWarned = true; state.isPaused = true;
-                updateUIState('PRIVACY_BLOCK'); refreshKeepAlive();
-                addLog('🧩 Privacy/ad-blocker is breaking X — disable it for x.com, then Resume.');
-                continue;
-            }
-            if (isRateLimited()) {
-                state.isPaused = true; updateUIState('RATE_LIMIT'); refreshKeepAlive();
-                addLog('🚦 Rate limit detected — pausing.'); continue;
-            }
-            if (state.actionCount >= state.maxActions) { updateUIState('FINISHED'); break; }
-
-            const tweets = Array.from(document.querySelectorAll('[data-testid="tweet"]')).filter(t => t.isConnected);
-            let fresh = tweets.filter(t => { const id = tweetId(t); return id && !state.processedIds.has(id); });
-
-            if (state.direction === 'up' && !state.randomizeOrder) {
-                fresh.reverse();
-            }
-
-            if (state.randomizeOrder) {
-                fresh = shuffleArray(fresh);
-            }
-
-            if (fresh.length === 0) {
-                state.emptyStreak++;
-                stepReveal();
-                if (state.emptyStreak >= 12 && !state.bgMode) {
-                    updateUIState('EXHAUSTED');
-                    addLog('🏁 No more pages from X — likely the real end of the feed.');
-                    break;
-                }
-                if (state.emptyStreak === 1 || state.emptyStreak % 5 === 0) {
-                    addLog('📜 No new tweets (streak ' + state.emptyStreak + ') — ' +
-                           (state.bgMode ? 'BG: IO asleep, use audible ping or a dedicated window'
-                                         : (state.direction === 'down' ? 'stepping down' : 'stepping up')) + '...');
-                }
-                await sleep(1500, 2500);
-                continue;
-            }
-            state.emptyStreak = 0;
-
-            let pausedOrDone = false;
-            for (const tweet of fresh) {
-                if (!state.isRunning || state.isPaused) { pausedOrDone = true; break; }
-                if (state.actionCount >= state.maxActions) { pausedOrDone = true; break; }
-                if (privacyBlockDetected()) {
-                    state.privacyWarned = true; state.isPaused = true; pausedOrDone = true;
-                    updateUIState('PRIVACY_BLOCK'); refreshKeepAlive();
-                    addLog('🧩 Privacy/ad-blocker broke X mid-run — disable it for x.com, then Resume.'); break;
-                }
-                if (isRateLimited()) {
-                    state.isPaused = true; pausedOrDone = true;
-                    updateUIState('RATE_LIMIT'); refreshKeepAlive();
-                    addLog('🚦 Rate limit mid-batch — pausing.'); break;
-                }
-                if (!tweet.isConnected) continue;
-                const id = tweetId(tweet);
-                if (!id || state.processedIds.has(id)) continue;
-
-                if (state.randomizeOrder) {
-                    if (Math.random() < 0.15) {
-                        state.focusLevel += (Math.random() - 0.5) * 0.6;
-                        state.focusLevel = Math.max(0.1, Math.min(0.95, state.focusLevel));
-                    }
-                    const dynamicSkipChance = 0.50 - (state.focusLevel * 0.45);
-                    if (Math.random() < dynamicSkipChance) {
-                        state.processedIds.add(id);
-                        tweet.setAttribute('data-processed', 'true');
-                        addLog('👀 Skipped (attention drift)');
-                        await sleep(state.minDelay, state.maxDelay);
-                        continue;
-                    }
-                }
-
-                const combo = pickActionCombo();
-                if (!combo.length) {
-                    state.processedIds.add(id);
-                    tweet.setAttribute('data-processed', 'true');
-                    continue;
-                }
-
-                if (state.randomizeOrder) {
-                    await sleep(300, 1200);
-                }
-
-                const performed = []; let failed = 0;
-                for (const act of combo) {
-                    let r = 0;
-                    if (act === 'like') r = await doLike(tweet);
-                    else if (act === 'retweet') r = await doRetweet(tweet);
-                    else if (act === 'bookmark') r = await doBookmark(tweet);
-                    if (r === 1) performed.push(ACTION_EMOJI[act]);
-                    else if (r === -1) failed++;
-                    if (combo.length > 1) await sleep(800, 1500);
-                }
-
-                if (performed.length) {
-                    state.consecutiveFailures = 0;
-                    state.processedIds.add(id);
-                    tweet.setAttribute('data-processed', 'true');
-                    state.actionCount++; updateUIState('RUNNING'); updateActionChips();
-                    addLog('🎲 ' + performed.join('+') + ' → tweet #' + state.actionCount);
-                } else if (failed > 0) {
-                    state.consecutiveFailures++;
-                    addLog('⚠️ action did not register (consecutive ' + state.consecutiveFailures + ')');
-                    if (state.consecutiveFailures >= 3) {
-                        state.isPaused = true; pausedOrDone = true;
-                        updateUIState('ACTION_FAIL'); refreshKeepAlive();
-                        addLog('🛑 3 actions in a row failed to register — likely a privacy/ad-blocker or soft throttle.');
-                        break;
-                    }
-                } else {
-                    state.consecutiveFailures = 0;
-                    state.processedIds.add(id);
-                    tweet.setAttribute('data-processed', 'true');
-                }
-
-                await sleep(state.minDelay, state.maxDelay);
-            }
-
-            if (!pausedOrDone && !state.isPaused && state.actionCount < state.maxActions) {
-                stepReveal();
-                await sleep(1000, 1600);
-            }
+    const toggleStart = async () => {
+        if (state.isActive) {
+            stopScript();
+            return;
         }
-    }
 
-    // --- INIT ---
+        state.isActive = true;
+        state.isPaused = false;
+        state.startTime = state.startTime || Date.now();
+        
+        btnStart.textContent = 'STOP';
+        btnStart.classList.add('stop');
+        btnPause.disabled = false;
+        btnPause.textContent = 'PAUSE';
+        
+        setStatus('Running...');
+        log('AutoFeed started.', 'success');
+
+        // Request Wake Lock if needed
+        if (state.settings.bgMode.includes('ping')) requestWakeLock();
+
+        // Start Save Timer
+        startSessionSaveTimer();
+
+        // Start BG Keep Alive
+        startKeepAliveLoop();
+
+        // Start Scroll Loop
+        scrollLoop();
+    };
+
+    const togglePause = () => {
+        if (!state.isActive) return;
+        
+        state.isPaused = !state.isPaused;
+        
+        if (state.isPaused) {
+            btnPause.textContent = 'RESUME';
+            setStatus('Paused');
+            clearTimeout(timers.scroll);
+            clearTimeout(timers.bg);
+            log('AutoFeed paused.');
+        } else {
+            btnPause.textContent = 'PAUSE';
+            setStatus('Resuming...');
+            log('AutoFeed resumed.');
+            startKeepAliveLoop();
+            scrollLoop();
+        }
+    };
+
+    const stopScript = () => {
+        state.isActive = false;
+        state.isPaused = false;
+        
+        // Clear all timers
+        clearTimeout(timers.scroll);
+        clearTimeout(timers.bg);
+        clearInterval(timers.save);
+        
+        // Release Wake Lock
+        if (wakeLock) wakeLock.release();
+
+        // Reset UI
+        btnStart.textContent = 'START';
+        btnStart.classList.remove('stop');
+        btnPause.disabled = true;
+        btnPause.textContent = 'PAUSE';
+        setStatus('Stopped');
+        
+        // Save final state then clear active flag but keep history
+        saveSessionState();
+        log('AutoFeed stopped. Session saved.', 'warn');
+    };
+
+    const scrollLoop = async () => {
+        if (!state.isActive || state.isPaused) return;
+
+        const tweets = getTweetElements();
+        let newContentFound = false;
+
+        // Process existing tweets
+        tweets.forEach(processTweet);
+
+        // Scroll
+        const scrolled = await scrollToBottom();
+        
+        if (!scrolled) {
+            state.streak++;
+            if (state.streak > 5) {
+                log(`No new tweets (streak ${state.streak}) — BG: IO asleep? Try unmuting tab.`, 'warn');
+                setStatus('Waiting for content...');
+                // Force a harder nudge if stuck
+                if(document.hidden) window.scrollTo(0, 0); 
+            }
+        } else {
+            state.streak = 0;
+            setStatus('Scrolling...');
+        }
+
+        // Check Break Interval
+        if (state.scrollCount > 0 && state.scrollCount % state.settings.breakInterval === 0) {
+            setStatus(`Taking a break (${state.settings.breakDuration/1000}s)...`);
+            log('Break interval reached. Pausing...', 'warn');
+            timers.break = setTimeout(() => {
+                if(state.isActive && !state.isPaused) scrollLoop();
+            }, state.settings.breakDuration);
+            return;
+        }
+
+        // Next iteration
+        timers.scroll = setTimeout(scrollLoop, getRandomDelay(state.settings.scrollDelay, state.settings.randomFactor));
+    };
+
+    // --- INITIALIZATION ---
+    
+    // Handle Page Unload/Refresh
+    window.addEventListener('beforeunload', () => {
+        if (state.isActive) {
+            saveSessionState();
+            log('Page unloading. Session saved for recovery.', 'info');
+        }
+    });
+
+    // Observer to wait for X.com to load
     const initObserver = new MutationObserver(() => {
         if (document.querySelector('[data-testid="primaryColumn"]')) {
             initObserver.disconnect();
             createUI();
-            console.log('%c⚡ Auto-Feed v4.9 loaded — Randomised Volume + Dynamic Drift + Animated UI', 'color:#1d9bf0;font-weight:bold;');
+            console.log('%c⚡ Auto-Feed v5.2 loaded — Session Persistence + Critical BG Tab Fixes', 'color:#1d9bf0;font-weight:bold;');
         }
     });
-    initObserver.observe(document.body, { childList: true, subtree: true });
+
+    if (document.readyState === 'loading') {
+        initObserver.observe(document.body, { childList: true, subtree: true });
+    } else {
+        // DOM already ready
+        if (document.querySelector('[data-testid="primaryColumn"]')) {
+            createUI();
+        } else {
+            initObserver.observe(document.body, { childList: true, subtree: true });
+        }
+    }
+
 })();
