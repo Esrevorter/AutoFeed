@@ -3,7 +3,7 @@
 [![Tampermonkey](https://img.shields.io/badge/Tampermonkey-Userscript-00485B?style=for-the-badge&logo=tampermonkey)](https://www.tampermonkey.net/)
 [![License](https://img.shields.io/github/license/Esrevorter/AutoFeed?style=for-the-badge)](LICENSE)
 [![Version](https://img.shields.io/github/v/release/Esrevorter/AutoFeed?style=for-the-badge&label=Latest%20Version)](https://github.com/Esrevorter/AutoFeed/releases)
-[![Version 5.2](https://img.shields.io/badge/Current_Version-5.2-blue?style=for-the-badge)](https://github.com/Esrevorter/AutoFeed)
+[![Version](https://img.shields.io/badge/Current_Version-5.0-blue?style=for-the-badge)](https://github.com/Esrevorter/AutoFeed)
 
 > **Automate your X (Twitter) experience with intelligent, safe, and customizable feed interactions.**
 
@@ -111,7 +111,7 @@ Choose how the script navigates the feed:
 - **Up**: Reverse scrolling (bottom to top)
 
 ### Background Tab Mode
-Keep the script running when the tab is not active (v5.1 Enhanced):
+Keep the script running when the tab is not active:
 
 | Mode | Description | Best For |
 |------|-------------|----------|
@@ -119,7 +119,7 @@ Keep the script running when the tab is not active (v5.1 Enhanced):
 | **Light** | Minimal keep-alive using DOM heartbeat | Saving resources |
 | **Aggressive** | Audio pings + scroll nudges + multi-strategy heartbeat | Maximum reliability |
 
-**🆕 v5.1 Background Improvements:**
+**Background Improvements:**
 - ✅ Fresh AudioContext creation per ping to prevent browser suspension
 - ✅ Recursive setTimeout instead of setInterval to defeat throttling
 - ✅ Enhanced scroll nudge with CSS transforms for better visibility
@@ -196,7 +196,6 @@ If you see consecutive log messages about IO being asleep:
 - **Enable Audible Pings**: Ensure audio is not muted for the tab
 - **Check Browser Settings**: Some browsers have strict background throttling
 - **Try Dedicated Window**: Keep a second small window open for the tab
-- **Update to v5.2+**: Latest version has session persistence AND critical background fixes
 - **Verify Audio Context**: Make sure your browser allows audio in background
 
 ### Getting Help
@@ -243,7 +242,7 @@ This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) fi
 
 ## 🏷️ Version History
 
-### v5.2 (Current - Latest)
+### v5.0 (Current - Latest)
 - 💾 **SESSION PERSISTENCE & AUTO-RECOVERY**: Script now survives page refreshes!
   - Automatic state saving every 5 seconds during active sessions
   - Saves scroll position, processed tweet IDs, and session statistics
@@ -256,8 +255,6 @@ This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) fi
 - ✅ Beforeunload handler ensures state is saved during navigation
 - ✅ Session timer management prevents memory leaks
 - 📖 Updated documentation with session persistence usage guide
-
-### v5.1
 - 🎯 **Critical Background Tab Fixes**: Resolved "IO asleep" throttling issues
   - Fresh AudioContext creation per ping prevents browser suspension
   - Recursive setTimeout defeats aggressive interval throttling
@@ -269,13 +266,11 @@ This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) fi
 - ✅ Better handling of browser throttling mechanisms
 - ✅ Updated documentation with background usage best practices
 
-### v5.0
+### v4.9
 - 🌐 **Enhanced Background Support**: Added Ping + Scroll Nudge mode
 - 🔒 Wake Lock API integration for preventing screen sleep
 - 💓 Heartbeat mechanism using DOM touches
 - 📊 Improved logging for background state detection
-
-### v4.9
 - ✅ Added support for mobile.twitter.com and mobile.x.com domains
 - ✅ Integrated automatic update mechanism via GitHub
 - ✅ Enhanced documentation with comprehensive troubleshooting guide
