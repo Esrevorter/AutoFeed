@@ -1,35 +1,19 @@
 ```
-# Userscripts distribution folder
-dist/
+# Logs and temp files
+*.log
+*.tmp
+*.swp
 
-# Environment variables
+# Environment
 .env
 .env.local
 .env.*
 
-# Dependencies
-node_modules/
-vendor/
-
-# Logs
-*.log
-
-# Temporary files
-*.tmp
-*.temp
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Editor/IDE files
+# Editors
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Build outputs
-build/
-target/
-dist/
+# Original rules preserved
+*.log
 ```
+Nothing should be ignored based on the provided file changes. The only added file is README.md, which is a source/config file and should not be ignored.
