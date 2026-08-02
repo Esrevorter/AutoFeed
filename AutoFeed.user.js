@@ -109,14 +109,14 @@
     // --- CONFIGURATION & STATE ---
     const CONFIG = {
         scrollDelay: 1500,
-        randomFactor: 0.3, // 30% variance
-        maxScrolls: 0, // 0 = infinite
-        actionChance: 0.05, // 5% chance to like/retweet
-        breakInterval: 50, // Take a break every 50 tweets
-        breakDuration: 30000, // 30 sec break
-        bgMode: 'ping_scroll', // 'silent', 'ping', 'ping_scroll'
-        saveInterval: 5000, // Auto-save state every 5s
-        sessionTimeout: 30 * 60 * 1000, // Invalidate session after 30 mins
+        randomFactor: 0.3,
+        maxScrolls: 0,
+        actionChance: 0.05,
+        breakInterval: 50,
+        breakDuration: 30000,
+        bgMode: 'ping_scroll',
+        saveInterval: 5000,
+        sessionTimeout: 30 * 60 * 1000,
     };
 
     let state = {
@@ -133,7 +133,8 @@
     let timers = {
         scroll: null,
         save: null,
-        break: null
+        break: null,
+        bg: null
     };
 
     let audioCtx = null;
@@ -156,7 +157,7 @@
         return base + (Math.random() * variance * 2 - variance);
     };
 
-    // --- SESSION PERSISTENCE ---
+    // --- SESSION PERSISTENCE (Surgically Added) ---
     const saveSessionState = () => {
         if (!state.isActive && state.scrollCount === 0) return;
         
@@ -172,7 +173,7 @@
         
         try {
             GM_setValue('autofeed_session', payload);
-            // log('Session state saved.', 'info');
+            // Silent save to avoid log spam
         } catch (e) {
             console.error('Failed to save session:', e);
         }
@@ -183,14 +184,12 @@
             const saved = GM_getValue('autofeed_session', null);
             if (!saved) return null;
 
-            // Validate session age
             if (Date.now() - saved.timestamp > CONFIG.sessionTimeout) {
                 log('Previous session expired (>30m). Starting fresh.', 'warn');
                 GM_deleteValue('autofeed_session');
                 return null;
             }
 
-            // Validate version compatibility
             if (saved.version !== '5.2') {
                 log(`Session from v${saved.version} detected. Partial recovery only.`, 'warn');
             }
@@ -222,8 +221,14 @@
             state.startTime = saved.startTime || Date.now();
             state.settings = { ...CONFIG, ...saved.settings };
             
-            // Update UI stats immediately
-            updateStats();
+            // Update UI stats immediately if elements exist
+            if(statScrolls) statScrolls.textContent = state.scrollCount;
+            if(statTime && state.startTime) {
+                 const diff = Math.floor((Date.now() - state.startTime) / 1000);
+                 const m = Math.floor(diff / 60).toString().padStart(2, '0');
+                 const s = (diff % 60).toString().padStart(2, '0');
+                 statTime.textContent = `${m}:${s}`;
+            }
             
             // Notify user
             GM_notification({
@@ -232,16 +237,15 @@
                 timeout: 5000
             });
 
-            // Auto-resume? Optional. For now, we wait for user to hit START to be safe.
+            // We do NOT auto-start. We wait for user to hit START to be safe.
             // But we populate the UI with recovered data.
-            if(statScrolls) statScrolls.textContent = state.scrollCount;
+            if(statusText) statusText.textContent = `Session Recovered (${state.scrollCount} tweets). Press START.`;
         }
     };
 
     // --- CORE LOGIC ---
 
     const getTweetElements = () => {
-        // Selectors for X.com articles (tweets)
         return document.querySelectorAll('article[data-testid="tweet"]');
     };
 
@@ -253,7 +257,6 @@
         state.scrollCount++;
         state.streak = 0;
         
-        // Random Actions (Like/Retweet)
         if (Math.random() < state.settings.actionChance) {
             performRandomAction(el);
         }
@@ -263,14 +266,9 @@
     };
 
     const performRandomAction = (el) => {
-        // Placeholder for actual DOM clicking logic
-        // In a real implementation, find heart/retweet icons within 'el' and click
         const actions = ['like', 'retweet', 'bookmark'];
         const action = actions[Math.floor(Math.random() * actions.length)];
         log(`Simulating ${action}...`, 'info');
-        // Actual click logic would go here:
-        // const btn = el.querySelector(`[data-testid="${action}"]`);
-        // if(btn) btn.click();
     };
 
     const scrollToBottom = async () => {
@@ -283,19 +281,18 @@
         return newHeight > currentHeight;
     };
 
-    // --- BACKGROUND TAB KEEP-ALIVE (v5.2 Enhanced) ---
+    // --- BACKGROUND TAB KEEP-ALIVE (v5.1/v5.2 Enhanced) ---
     
     const playPing = () => {
         if (document.hidden && state.settings.bgMode.includes('ping')) {
             try {
-                // Create FRESH context every time to avoid suspension issues
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(8000, ctx.currentTime); // High pitch, short
-                gain.gain.setValueAtTime(0.001, ctx.currentTime); // Very quiet
+                osc.frequency.setValueAtTime(8000, ctx.currentTime);
+                gain.gain.setValueAtTime(0.001, ctx.currentTime);
                 
                 osc.connect(gain);
                 gain.connect(ctx.destination);
@@ -303,18 +300,14 @@
                 osc.start();
                 osc.stop(ctx.currentTime + 0.1);
                 
-                // Cleanup immediately
                 setTimeout(() => ctx.close(), 200);
-            } catch (e) {
-                // Ignore audio errors
-            }
+            } catch (e) { /* Ignore */ }
         }
     };
 
     const nudgeScroll = () => {
         if (document.hidden && state.settings.bgMode.includes('scroll')) {
             const y = window.scrollY;
-            // Micro nudge using transform to be less intrusive but trigger IO
             window.scrollBy(0, 1); 
             setTimeout(() => window.scrollBy(0, -1), 100);
         }
@@ -335,21 +328,19 @@
     };
 
     const startKeepAliveLoop = () => {
-        // Recursive loop to defeat setInterval throttling in background
         const loop = () => {
             if (!state.isActive) return;
             
             playPing();
             nudgeScroll();
             
-            // Randomize interval slightly to look human
             const nextTick = getRandomDelay(2000, 0.2); 
             timers.bg = setTimeout(loop, nextTick);
         };
         loop();
     };
 
-    // --- UI FUNCTIONS ---
+    // --- UI FUNCTIONS (RESTORED TO V5.0 STRUCTURE) ---
 
     const createUI = () => {
         if (document.getElementById('autofeed-panel')) return;
@@ -377,6 +368,7 @@
             #af-status { font-size: 12px; color: #aaa; margin-top: 5px; font-style: italic; }
             input[type="number"] { width: 60px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px; padding: 2px; }
             label { font-size: 12px; color: #ccc; }
+            select { background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; padding: 2px; }
         `);
 
         const panel = document.createElement('div');
@@ -401,7 +393,7 @@
             </div>
             <div class="af-row">
                 <label for="af-bg">BG Mode:</label>
-                <select id="af-bg" style="background:#333;color:#fff;border:none;border-radius:4px;">
+                <select id="af-bg">
                     <option value="silent">Silent</option>
                     <option value="ping">Audio Ping</option>
                     <option value="ping_scroll" selected>Ping + Nudge</option>
@@ -422,9 +414,10 @@
         btnPause = document.getElementById('af-pause');
         statScrolls = document.getElementById('af-scrolls');
         statTime = document.getElementById('af-time');
+        statusText = document.getElementById('af-status');
+        
         const inpSpeed = document.getElementById('af-speed');
         const selBg = document.getElementById('af-bg');
-        const statusDiv = document.getElementById('af-status');
 
         btnStart.onclick = toggleStart;
         btnPause.onclick = togglePause;
@@ -456,11 +449,6 @@
         }
     };
 
-    const setStatus = (msg) => {
-        const el = document.getElementById('af-status');
-        if (el) el.textContent = msg;
-    };
-
     // --- MAIN LOOP ---
 
     const toggleStart = async () => {
@@ -478,19 +466,14 @@
         btnPause.disabled = false;
         btnPause.textContent = 'PAUSE';
         
-        setStatus('Running...');
+        if(statusText) statusText.textContent = 'Running...';
         log('AutoFeed started.', 'success');
 
-        // Request Wake Lock if needed
         if (state.settings.bgMode.includes('ping')) requestWakeLock();
 
-        // Start Save Timer
         startSessionSaveTimer();
-
-        // Start BG Keep Alive
         startKeepAliveLoop();
 
-        // Start Scroll Loop
         scrollLoop();
     };
 
@@ -501,13 +484,13 @@
         
         if (state.isPaused) {
             btnPause.textContent = 'RESUME';
-            setStatus('Paused');
+            if(statusText) statusText.textContent = 'Paused';
             clearTimeout(timers.scroll);
             clearTimeout(timers.bg);
             log('AutoFeed paused.');
         } else {
             btnPause.textContent = 'PAUSE';
-            setStatus('Resuming...');
+            if(statusText) statusText.textContent = 'Resuming...';
             log('AutoFeed resumed.');
             startKeepAliveLoop();
             scrollLoop();
@@ -518,20 +501,17 @@
         state.isActive = false;
         state.isPaused = false;
         
-        // Clear all timers
         clearTimeout(timers.scroll);
         clearTimeout(timers.bg);
         clearInterval(timers.save);
         
-        // Release Wake Lock
         if (wakeLock) wakeLock.release();
 
-        // Reset UI
         btnStart.textContent = 'START';
         btnStart.classList.remove('stop');
         btnPause.disabled = true;
         btnPause.textContent = 'PAUSE';
-        setStatus('Stopped');
+        if(statusText) statusText.textContent = 'Stopped';
         
         // Save final state then clear active flag but keep history
         saveSessionState();
@@ -544,28 +524,24 @@
         const tweets = getTweetElements();
         let newContentFound = false;
 
-        // Process existing tweets
         tweets.forEach(processTweet);
 
-        // Scroll
         const scrolled = await scrollToBottom();
         
         if (!scrolled) {
             state.streak++;
             if (state.streak > 5) {
                 log(`No new tweets (streak ${state.streak}) — BG: IO asleep? Try unmuting tab.`, 'warn');
-                setStatus('Waiting for content...');
-                // Force a harder nudge if stuck
+                if(statusText) statusText.textContent = 'Waiting for content...';
                 if(document.hidden) window.scrollTo(0, 0); 
             }
         } else {
             state.streak = 0;
-            setStatus('Scrolling...');
+            if(statusText) statusText.textContent = 'Scrolling...';
         }
 
-        // Check Break Interval
         if (state.scrollCount > 0 && state.scrollCount % state.settings.breakInterval === 0) {
-            setStatus(`Taking a break (${state.settings.breakDuration/1000}s)...`);
+            if(statusText) statusText.textContent = `Taking a break (${state.settings.breakDuration/1000}s)...`;
             log('Break interval reached. Pausing...', 'warn');
             timers.break = setTimeout(() => {
                 if(state.isActive && !state.isPaused) scrollLoop();
@@ -573,13 +549,11 @@
             return;
         }
 
-        // Next iteration
         timers.scroll = setTimeout(scrollLoop, getRandomDelay(state.settings.scrollDelay, state.settings.randomFactor));
     };
 
     // --- INITIALIZATION ---
     
-    // Handle Page Unload/Refresh
     window.addEventListener('beforeunload', () => {
         if (state.isActive) {
             saveSessionState();
@@ -587,7 +561,6 @@
         }
     });
 
-    // Observer to wait for X.com to load
     const initObserver = new MutationObserver(() => {
         if (document.querySelector('[data-testid="primaryColumn"]')) {
             initObserver.disconnect();
@@ -599,7 +572,6 @@
     if (document.readyState === 'loading') {
         initObserver.observe(document.body, { childList: true, subtree: true });
     } else {
-        // DOM already ready
         if (document.querySelector('[data-testid="primaryColumn"]')) {
             createUI();
         } else {
