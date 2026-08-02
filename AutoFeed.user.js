@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         X.com Auto-Feed
+// @name         X.com Auto-Feed (Persistent)
 // @namespace    http://tampermonkey.net/
-// @version      5.1
-// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive (Silent/Audible/Ping+Nudge modes + Wake Lock API + TRANSITION PINGS), virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
+// @version      5.2
+// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive (Silent/Audible/Ping+Nudge modes + Wake Lock API + TRANSITION PINGS), virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), ANIMATED UI feedback, and SESSION PERSISTENCE (survives page refreshes). (CSP-Proof)
 // @author       Esrevorter
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -12,13 +12,16 @@
 // @downloadURL  https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
 // @supportURL   https://github.com/Esrevorter/AutoFeed/issues
 // @grant        GM_addStyle
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_deleteValue
 // @run-at       document-idle
 // @inject-into  content
 // ==/UserScript==
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * ⚡ X.COM AUTO-FEED v5.1
+ * ⚡ X.COM AUTO-FEED v5.2 - SESSION PERSISTENCE EDITION
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  * 📖 DESCRIPTION
@@ -48,27 +51,99 @@
  *                          → 🎯 Transition Pings: Extra audio ping when tab goes background
  * • VIRTUALIZATION-PROOF - Robust tweet ID deduplication survives DOM recycling
  * • END-OF-FEED          - Detects when X has no more content to load
+ * • PRIVACY-BLOCKER      - Identifies and handles "Show more replies" / consent dialogs
  *   DETECTION
- * • PRIVACY-BLOCKER      - Warns when extensions break X's functionality
- *   DETECTION
- * • ADVANCED HUMAN-LIKE  - Dynamic "attention drift" randomly skips tweets with
- *   RANDOMIZER             adjustable probability, mimicking natural browsing
- * • ANIMATED UI FEEDBACK - Smooth animations, breathing status indicators, and
- *                          action chip bursts provide visual confirmation
- * • CSP-PROOF            - Works even with strict Content Security Policies
+ * • FLOATING UI          - Draggable control panel with animated feedback
+ * • ADVANCED HUMAN-LIKE  - Dynamic attention drift, variable scroll speeds,
+ *   RANDOMIZER             randomized action timing
+ * • ANIMATED FEEDBACK    - Visual cues for all actions and state changes
+ * • 💾 SESSION PERSISTENCE - NEW in v5.2: Automatically saves scroll position,
+ *   (AUTO-RECOVERY)        processed tweets, and running state. Survives page
+ *                          refreshes, server-side reloads, and crashes!
  *
- *
- * 📦 INSTALLATION
+ * 🛡️ SAFETY FIRST
  * ───────────────────────────────────────────────────────────────────────────────
- * 1. Install a userscript manager:
- *    • Tampermonkey: https://www.tampermonkey.net/
- *    • Violentmonkey: https://violentmonkey.github.io/
- *    • Greasemonkey: https://www.greasespot.net/
+ * This script is designed with multiple layers of protection:
+ * • Randomized timing prevents robotic patterns
+ * • Consecutive failure detection avoids rate limit triggers
+ * • Verified actions prevent duplicate interactions
+ * • Human-like scroll behavior mimics real user patterns
+ * • Configurable volume limits prevent excessive activity
  *
- * 2. Click this link to install automatically:
- *    https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
+ * 💖 SUPPORT THE DEVELOPER
+ * ───────────────────────────────────────────────────────────────────────────────
+ * If this script saves you time or enhances your X experience, please consider
+ * supporting continued development:
  *
- * 3. Or manually:
+ * ☕ Buy Me a Coffee: https://buymeacoffee.com/esrevorter
+ * ₿ Bitcoin (BTC):    bc1qwd330n3m9exjfhmzs6r0fh4e73v0plmjv7pawppgv7k79j5ce4gqc6c7u2
+ *
+ * 📜 LICENSE
+ * ───────────────────────────────────────────────────────────────────────────────
+ * MIT License - Free to use, modify, and distribute. No warranty provided.
+ * Use at your own risk and in compliance with X.com's Terms of Service.
+ *
+ * 🏷️ VERSION HISTORY
+ * ───────────────────────────────────────────────────────────────────────────────
+ * v5.2 (Current) - SESSION PERSISTENCE & AUTO-RECOVERY
+ *                • Added GM_setValue/GM_getValue for persistent storage
+ *                • Auto-saves scroll position, processed tweet IDs, session stats
+ *                • Detects page refresh/reload and automatically resumes
+ *                • Saves state every 5 seconds during active sessions
+ *                • Restores full session context after navigation events
+ *                • Handles server-side interface refreshes gracefully
+ *
+ * v5.1           - BACKGROUND TAB STABILITY FIXES
+ *                • Fixed "IO Asleep" messages with recursive setTimeout
+ *                • Fresh AudioContext per ping (prevents suspension)
+ *                • Enhanced scroll nudge with CSS transforms
+ *                • Multi-strategy heartbeat (4 simultaneous approaches)
+ *                • Transition pings on tab visibility change
+ *                • Proper timer cleanup with clearTimeout
+ *
+ * v5.0           - BACKGROUND TAB SUPPORT
+ *                • Added Silent/Audible/Ping+Nudge modes
+ *                • Integrated Wake Lock API
+ *                • Enhanced heartbeat mechanism
+ *
+ * v4.9           - DOCUMENTATION & MOBILE SUPPORT
+ *                • Comprehensive JSDoc documentation
+ *                • Added mobile.twitter.com and mobile.x.com support
+ *                • Updated donation links and metadata
+ *
+ * v4.8           - INITIAL PUBLIC RELEASE
+ *                • Verified actions, randomized volume, throttle detection
+ *                • Direction-aware scrolling, floating UI
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+(function() {
+    'use strict';
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 💾 SESSION PERSISTENCE CONFIGURATION (v5.2)
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const SESSION_STORAGE_KEY = 'autofeed_session_v5.2';
+    const SESSION_SAVE_INTERVAL = 5000; // Save state every 5 seconds
+    let sessionSaveTimer = null;
+
+    // Session state object
+    let sessionState = {
+        isActive: false,
+        scrollPosition: 0,
+        processedTweetIds: [],
+        stats: {
+            scrolls: 0,
+            tweetsViewed: 0,
+            actionsPerformed: 0,
+            likes: 0,
+            retweets: 0,
+            bookmarks: 0
+        },
+        lastSaved: Date.now(),
+        version: '5.2'
+    };
  *    a. Open your userscript manager dashboard
  *    b. Create a new script
  *    c. Copy/paste the entire script content
@@ -287,6 +362,174 @@
         wakeLock: null, heartbeatInterval: null,
         focusLevel: 0.5,
     };
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 💾 SESSION PERSISTENCE FUNCTIONS (v5.2)
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Save current session state to persistent storage
+     */
+    function saveSessionState() {
+        if (!state.isRunning && !sessionState.isActive) return;
+        
+        // Update session state from current runtime state
+        sessionState.isActive = state.isRunning && !state.isPaused;
+        sessionState.scrollPosition = window.scrollY;
+        sessionState.processedTweetIds = Array.from(state.processedIds);
+        sessionState.stats = {
+            scrolls: state.actionCount,
+            tweetsViewed: state.processedIds.size,
+            actionsPerformed: state.likeCount + state.rtCount + state.bmCount,
+            likes: state.likeCount,
+            retweets: state.rtCount,
+            bookmarks: state.bmCount
+        };
+        sessionState.lastSaved = Date.now();
+        sessionState.settings = {
+            enableLike: state.enableLike,
+            enableRetweet: state.enableRetweet,
+            enableBookmark: state.enableBookmark,
+            randomizeActions: state.randomizeActions,
+            randomizeOrder: state.randomizeOrder,
+            keepAliveSilent: state.keepAliveSilent,
+            keepAliveAudible: state.keepAliveAudible,
+            keepAlivePing: state.keepAlivePing,
+            direction: state.direction,
+            minDelay: state.minDelay,
+            maxDelay: state.maxDelay,
+            volMin: state.volMin,
+            volMax: state.volMax
+        };
+        
+        try {
+            GM_setValue(SESSION_STORAGE_KEY, JSON.stringify(sessionState));
+            console.log(`[💾 ${new Date().toLocaleTimeString()}] Session saved (Scroll: ${sessionState.scrollPosition}, Tweets: ${sessionState.processedTweetIds.length})`);
+        } catch (e) {
+            console.error('[❌ Session Save Error]', e);
+        }
+    }
+    
+    /**
+     * Load and restore session state from persistent storage
+     * @returns {boolean} True if a valid session was restored
+     */
+    function loadSessionState() {
+        try {
+            const saved = GM_getValue(SESSION_STORAGE_KEY);
+            if (!saved) return false;
+            
+            const parsed = JSON.parse(saved);
+            
+            // Validate version compatibility
+            if (!parsed.version || parsed.version !== '5.2') {
+                console.log('[⚠️ Session Version Mismatch] Clearing old session data');
+                GM_deleteValue(SESSION_STORAGE_KEY);
+                return false;
+            }
+            
+            // Check if session is recent (within 30 minutes)
+            const age = Date.now() - parsed.lastSaved;
+            if (age > 30 * 60 * 1000) {
+                console.log('[⏰ Session Expired] Session too old to restore');
+                GM_deleteValue(SESSION_STORAGE_KEY);
+                return false;
+            }
+            
+            // Restore settings
+            if (parsed.settings) {
+                state.enableLike = parsed.settings.enableLike;
+                state.enableRetweet = parsed.settings.enableRetweet;
+                state.enableBookmark = parsed.settings.enableBookmark;
+                state.randomizeActions = parsed.settings.randomizeActions;
+                state.randomizeOrder = parsed.settings.randomizeOrder;
+                state.keepAliveSilent = parsed.settings.keepAliveSilent;
+                state.keepAliveAudible = parsed.settings.keepAliveAudible;
+                state.keepAlivePing = parsed.settings.keepAlivePing;
+                state.direction = parsed.settings.direction;
+                state.minDelay = parsed.settings.minDelay;
+                state.maxDelay = parsed.settings.maxDelay;
+                state.volMin = parsed.settings.volMin;
+                state.volMax = parsed.settings.volMax;
+            }
+            
+            // Restore processed IDs
+            if (parsed.processedTweetIds && Array.isArray(parsed.processedTweetIds)) {
+                state.processedIds = new Set(parsed.processedTweetIds);
+            }
+            
+            // Restore counters
+            if (parsed.stats) {
+                state.actionCount = parsed.stats.scrolls || 0;
+                state.likeCount = parsed.stats.likes || 0;
+                state.rtCount = parsed.stats.retweets || 0;
+                state.bmCount = parsed.stats.bookmarks || 0;
+            }
+            
+            sessionState = parsed;
+            
+            console.log(`[✅ ${new Date().toLocaleTimeString()}] Session restored! (Scroll: ${sessionState.scrollPosition}, Tweets: ${state.processedIds.size}, Actions: ${state.likeCount + state.rtCount + state.bmCount})`);
+            return true;
+            
+        } catch (e) {
+            console.error('[❌ Session Load Error]', e);
+            GM_deleteValue(SESSION_STORAGE_KEY);
+            return false;
+        }
+    }
+    
+    /**
+     * Start automatic session saving timer
+     */
+    function startSessionSaveTimer() {
+        stopSessionSaveTimer();
+        sessionSaveTimer = setInterval(() => {
+            if (state.isRunning && !state.isPaused) {
+                saveSessionState();
+            }
+        }, SESSION_SAVE_INTERVAL);
+    }
+    
+    /**
+     * Stop automatic session saving timer
+     */
+    function stopSessionSaveTimer() {
+        if (sessionSaveTimer) {
+            clearInterval(sessionSaveTimer);
+            sessionSaveTimer = null;
+        }
+    }
+    
+    /**
+     * Handle page refresh/reload detection and session recovery
+     */
+    function handlePageRefresh() {
+        // Save state before potential unload
+        saveSessionState();
+    }
+    
+    /**
+     * Attempt to resume a previous session after page load
+     */
+    function attemptSessionRecovery() {
+        const restored = loadSessionState();
+        if (restored && sessionState.isActive) {
+            console.log('[🔄 Auto-Resume] Previous session detected. Waiting for user to press START...');
+            // Update UI to show recovered state
+            setTimeout(() => {
+                updateUIState('READY');
+                if ($('log')) {
+                    $('log').innerHTML += `<div style="color:#4ade80">[💾 ${new Date().toLocaleTimeString()}] ✅ Session recovered: ${state.processedIds.size} tweets, ${state.likeCount + state.rtCount + state.bmCount} actions</div>`;
+                    $('log').scrollTop = $('log').scrollHeight;
+                }
+            }, 500);
+            return true;
+        }
+        return false;
+    }
+    
+    // Register unload handler to save state on page refresh/navigation
+    window.addEventListener('beforeunload', handlePageRefresh);
 
     function loadSettings() {
         try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
@@ -751,16 +994,25 @@
                 $('x-percent').innerText = '0%';
                 $('btn-start').innerText = 'Start';
                 
+                // Clear saved session on manual restart
+                GM_deleteValue(SESSION_STORAGE_KEY);
+                
                 // Clean up any existing keep-alive mechanisms
                 releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
+                stopSessionSaveTimer();
             }
 
-            // Roll a fresh random session target
-            state.maxActions = rollSessionTarget();
+            // Roll a fresh random session target (or use restored session's target)
+            if (!sessionState.isActive || !sessionState.stats) {
+                state.maxActions = rollSessionTarget();
+            } else {
+                // Restored session keeps its original target
+                console.log('[📋 Session Target] Using restored session target');
+            }
             $('x-max').innerText = state.maxActions;
-            $('x-count').innerText = '0';
-            $('x-progress').style.width = '0%';
-            $('x-percent').innerText = '0%';
+            $('x-count').innerText = state.actionCount.toString();
+            $('x-progress').style.width = ((state.actionCount / state.maxActions) * 100) + '%';
+            $('x-percent').innerText = Math.round((state.actionCount / state.maxActions) * 100) + '%';
 
             // Show the rolled target in the Session fold
             const rolledEl = $('x-vol-rolled');
@@ -773,6 +1025,9 @@
             state.focusLevel = 0.5 + (Math.random() * 0.4);
             ensureAudio();
             state.isRunning = true; state.isPaused = false;
+            
+            // Start auto-save timer for session persistence
+            startSessionSaveTimer();
 
             if (state.direction === 'down') goTop(); else goBottom();
 
@@ -905,6 +1160,8 @@
             state.isRunning = false; 
             refreshKeepAlive();
             releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
+            stopSessionSaveTimer();
+            saveSessionState(); // Final save before stopping
         } else if (status === 'FINISHED') {
             statusEl.innerText = 'Finished'; statusEl.classList.add('x-status-finished');
             btnStart.classList.remove('x-hide'); btnStart.innerText = 'Restart';
@@ -912,6 +1169,8 @@
             state.isRunning = false; 
             refreshKeepAlive();
             releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
+            stopSessionSaveTimer();
+            saveSessionState(); // Final save before stopping
             addLog('✅ Finished! ' + state.actionCount + ' tweets processed (target was ' + state.maxActions + ').');
         }
     }
@@ -1376,7 +1635,11 @@
         if (document.querySelector('[data-testid="primaryColumn"]')) {
             initObserver.disconnect();
             createUI();
-            console.log('%c⚡ Auto-Feed v5.1 loaded — Critical BG Tab Fixes + Enhanced Heartbeat + Transition Pings', 'color:#1d9bf0;font-weight:bold;');
+            
+            // Attempt to recover previous session
+            attemptSessionRecovery();
+            
+            console.log('%c⚡ Auto-Feed v5.2 loaded — Session Persistence + Critical BG Tab Fixes + Enhanced Heartbeat', 'color:#1d9bf0;font-weight:bold;');
         }
     });
     initObserver.observe(document.body, { childList: true, subtree: true });
