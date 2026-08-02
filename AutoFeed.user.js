@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         X.com Auto-Feed (Persistent)
+// @name         X.com Auto-Feed
 // @namespace    http://tampermonkey.net/
-// @version      5.2
-// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive (Silent/Audible/Ping+Nudge modes + Wake Lock API + TRANSITION PINGS), virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), ANIMATED UI feedback, and SESSION PERSISTENCE (survives page refreshes). (CSP-Proof)
+// @version      5.0
+// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive (Silent/Audible/Ping+Nudge modes + Wake Lock API), virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
 // @author       Esrevorter
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -12,16 +12,13 @@
 // @downloadURL  https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
 // @supportURL   https://github.com/Esrevorter/AutoFeed/issues
 // @grant        GM_addStyle
-// @grant        GM_setValue
-// @grant        GM_getValue
-// @grant        GM_deleteValue
 // @run-at       document-idle
 // @inject-into  content
 // ==/UserScript==
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * ⚡ X.COM AUTO-FEED v5.2 - SESSION PERSISTENCE EDITION
+ * ⚡ X.COM AUTO-FEED v5.0
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  * 📖 DESCRIPTION
@@ -45,299 +42,181 @@
  *   KEEP-ALIVE             throttling when tab is hidden:
  *                          → 🔇 Silent: Inaudible audio tone (default)
  *                          → 🔊 Audible: Faint blips every 6 seconds
- *                          → ⚡ Ping+Nudge: Aggressive 1.5s pings + micro-scrolls + DOM transforms
+ *                          → ⚡ Ping+Nudge: Aggressive 2s pings + micro-scrolls
  *                          → 🔒 Wake Lock API: Prevents screen sleep (modern browsers)
- *                          → 💓 Enhanced Heartbeat: Multi-strategy DOM touches (title, performance marks, classList)
- *                          → 🎯 Transition Pings: Extra audio ping when tab goes background
+ *                          → 💓 Heartbeat: DOM touches keep renderer engaged
  * • VIRTUALIZATION-PROOF - Robust tweet ID deduplication survives DOM recycling
  * • END-OF-FEED          - Detects when X has no more content to load
- * • PRIVACY-BLOCKER      - Identifies and handles "Show more replies" / consent dialogs
  *   DETECTION
- * • FLOATING UI          - Draggable control panel with animated feedback
- * • ADVANCED HUMAN-LIKE  - Dynamic attention drift, variable scroll speeds,
- *   RANDOMIZER             randomized action timing
- * • ANIMATED FEEDBACK    - Visual cues for all actions and state changes
- * • 💾 SESSION PERSISTENCE - NEW in v5.2: Automatically saves scroll position,
- *   (AUTO-RECOVERY)        processed tweets, and running state. Survives page
- *                          refreshes, server-side reloads, and crashes!
+ * • PRIVACY-BLOCKER      - Warns when extensions break X's functionality
+ *   DETECTION
+ * • ADVANCED HUMAN-LIKE  - Dynamic "attention drift" randomly skips tweets with
+ *   RANDOMIZER             adjustable probability, mimicking natural browsing
+ * • ANIMATED UI FEEDBACK - Smooth animations, breathing status indicators, and
+ *                          action chip bursts provide visual confirmation
+ * • CSP-PROOF            - Works even with strict Content Security Policies
  *
- * 🛡️ SAFETY FIRST
+ *
+ * 📦 INSTALLATION
  * ───────────────────────────────────────────────────────────────────────────────
- * This script is designed with multiple layers of protection:
- * • Randomized timing prevents robotic patterns
- * • Consecutive failure detection avoids rate limit triggers
- * • Verified actions prevent duplicate interactions
- * • Human-like scroll behavior mimics real user patterns
- * • Configurable volume limits prevent excessive activity
+ * 1. Install a userscript manager:
+ *    • Tampermonkey: https://www.tampermonkey.net/
+ *    • Violentmonkey: https://violentmonkey.github.io/
+ *    • Greasemonkey: https://www.greasespot.net/
+ *
+ * 2. Click this link to install automatically:
+ *    https://raw.githubusercontent.com/Esrevorter/AutoFeed/main/AutoFeed.user.js
+ *
+ * 3. Or manually:
+ *    a. Open your userscript manager dashboard
+ *    b. Create a new script
+ *    c. Copy/paste the entire script content
+ *    d. Save and enable
+ *
+ * 4. Navigate to X.com (or Twitter.com) — the control panel will appear
+ *
+ *
+ * 🔄 UPDATES
+ * ───────────────────────────────────────────────────────────────────────────────
+ * Automatic updates are enabled via @updateURL. Your userscript manager will
+ * check for new versions periodically. You can also manually check:
+ *    https://github.com/Esrevorter/AutoFeed
+ *
+ *
+ * 🎮 USAGE
+ * ───────────────────────────────────────────────────────────────────────────────
+ * 1. Navigate to your desired feed:
+ *    • Home Feed: https://x.com/home
+ *    • Lists: https://x.com/i/lists/[LIST_ID]
+ *    • Profile Lists: https://x.com/[USERNAME]/lists
+ *
+ * 2. Configure your preferences in the floating panel:
+ *    • Actions Fold: Select Like, Retweet, Bookmark; toggle random combos
+ *    • Session Volume: Set min/max tweet range for randomized targets
+ *    • Direction: Choose scroll direction based on feed type
+ *    • Background Tab: Enable silent/audible keep-alive for background use
+ *    • Delays: Set min/max delay between actions (milliseconds)
+ *
+ * 3. Press START to begin automation
+ *    • Panel shows real-time progress and action counters
+ *    • Log displays timestamped activity
+ *    • Animated chips pulse on each successful action
+ *
+ * 4. PAUSE anytime; RESUME after addressing warnings (rate limits, etc.)
+ *
+ * 5. When finished (target reached or end of feed), press RESTART for new session
+ *
+ *
+ * ⚙️ CONFIGURATION OPTIONS
+ * ───────────────────────────────────────────────────────────────────────────────
+ * Actions Fold:
+ *   ❤️ Likes           - Automatically like tweets
+ *   🔁 Retweets        - Automatically retweet (with confirmation click)
+ *   🔖 Bookmarks       - Automatically bookmark tweets
+ *   🎲 Random Combo    - Perform random subset of enabled actions per tweet
+ *   🔀 Randomizer      - Shuffle tweet order + dynamic attention drift
+ *
+ * Session Volume:
+ *   Min Tweets         - Lower bound for random session target (default: 50)
+ *   Max Tweets         - Upper bound for random session target (default: 200)
+ *   → Each session rolls a random target within this range
+ *
+ * Scroll Direction:
+ *   ⬇️ Top→Down        - Start from newest tweets (ideal for Feeds/Lists)
+ *   ⬆️ Bottom→Up       - Start from oldest visible tweets (For-You/backlog)
+ *
+ * Background Tab (NEW in v5.0):
+ *   🔇 Silent Keep-Alive  - Uses inaudible audio to prevent timer throttling
+ *   🔊 Audible Ping       - Faint blips every 6 seconds when tab is hidden
+ *   ⚡ Ping + Scroll Nudge - Aggressive mode: 2s pings + micro-scrolls (best for stubborn browsers)
+ *   🔒 Wake Lock API      - Automatically requests wake lock to prevent screen sleep
+ *   💓 Heartbeat          - DOM touches keep JavaScript engine active
+ *
+ * Delays:
+ *   Min Delay (ms)     - Minimum wait between actions (default: 4000ms)
+ *   Max Delay (ms)     - Maximum wait between actions (default: 9000ms)
+ *   → Actual delay is randomized within this range for human-like behavior
+ *
+ *
+ * 🛡️ SAFETY & BEST PRACTICES
+ * ───────────────────────────────────────────────────────────────────────────────
+ * • Use conservative delays (4000–9000ms recommended)
+ * • Set reasonable session volumes (50–200 tweets)
+ * • Take breaks between sessions to avoid rate limits
+ * • Disable privacy/ad-blockers for x.com if actions fail
+ * • Monitor the log for warnings; pause immediately if flagged
+ * • This script does NOT bypass CAPTCHAs or login walls
+ *
+ *
+ * 🐛 TROUBLESHOOTING
+ * ───────────────────────────────────────────────────────────────────────────────
+ * ⚠️ Rate Limit Detected:
+ *    → Wait 15+ minutes before resuming. Reduce volume/delays next session.
+ *
+ * 🛑 Actions Not Registering:
+ *    → Disable privacy/ad-blockers for x.com
+ *    → Check browser console for errors
+ *    → Refresh page and restart script
+ *
+ * 🧩 Privacy Blocker Warning:
+ *    → X detected extensions breaking page functionality
+ *    → Whitelist x.com in your blocker settings
+ *
+ * 📜 No New Tweets / End of Feed:
+ *    → Script auto-detects when feed is exhausted
+ *    → Press Restart to begin fresh session
+ *
+ * 🎭 Panel Not Appearing:
+ *    → Ensure userscript manager is enabled
+ *    → Check browser console for script errors
+ *    → Verify you're on a supported domain (x.com, twitter.com, mobile variants)
+ *
  *
  * 💖 SUPPORT THE DEVELOPER
  * ───────────────────────────────────────────────────────────────────────────────
- * If this script saves you time or enhances your X experience, please consider
- * supporting continued development:
+ * If you find this script useful, consider supporting its continued development!
  *
- * ☕ Buy Me a Coffee: https://buymeacoffee.com/esrevorter
- * ₿ Bitcoin (BTC):    bc1qwd330n3m9exjfhmzs6r0fh4e73v0plmjv7pawppgv7k79j5ce4gqc6c7u2
+ * ☕ Buy Me a Coffee:
+ *    https://buymeacoffee.com/esrevorter
+ *
+ * ₿ Bitcoin (BTC):
+ *    bc1qwd330n3m9exjfhmzs6r0fh4e73v0plmjv7pawppgv7k79j5ce4gqc6c7u2
+ *
+ * 🐙 GitHub:
+ *    https://github.com/Esrevorter/AutoFeed
+ *
+ * 📬 Report Issues:
+ *    https://github.com/Esrevorter/AutoFeed/issues
+ *
  *
  * 📜 LICENSE
  * ───────────────────────────────────────────────────────────────────────────────
- * MIT License - Free to use, modify, and distribute. No warranty provided.
- * Use at your own risk and in compliance with X.com's Terms of Service.
+ * See LICENSE file in the repository.
+ *
  *
  * 🏷️ VERSION HISTORY
  * ───────────────────────────────────────────────────────────────────────────────
- * v5.2 (Current) - SESSION PERSISTENCE & AUTO-RECOVERY
- *                • Added GM_setValue/GM_getValue for persistent storage
- *                • Auto-saves scroll position, processed tweet IDs, session stats
- *                • Detects page refresh/reload and automatically resumes
- *                • Saves state every 5 seconds during active sessions
- *                • Restores full session context after navigation events
- *                • Handles server-side interface refreshes gracefully
- *
- * v5.1           - BACKGROUND TAB STABILITY FIXES
- *                • Fixed "IO Asleep" messages with recursive setTimeout
- *                • Fresh AudioContext per ping (prevents suspension)
- *                • Enhanced scroll nudge with CSS transforms
- *                • Multi-strategy heartbeat (4 simultaneous approaches)
- *                • Transition pings on tab visibility change
- *                • Proper timer cleanup with clearTimeout
- *
- * v5.0           - BACKGROUND TAB SUPPORT
- *                • Added Silent/Audible/Ping+Nudge modes
- *                • Integrated Wake Lock API
- *                • Enhanced heartbeat mechanism
- *
- * v4.9           - DOCUMENTATION & MOBILE SUPPORT
- *                • Comprehensive JSDoc documentation
- *                • Added mobile.twitter.com and mobile.x.com support
- *                • Updated donation links and metadata
- *
- * v4.8           - INITIAL PUBLIC RELEASE
- *                • Verified actions, randomized volume, throttle detection
- *                • Direction-aware scrolling, floating UI
+ * v5.0 - ENHANCED BACKGROUND TAB SUPPORT (addresses "IO asleep" issue)
+ *      - ⚡ NEW: Ping + Scroll Nudge mode - Aggressive 2s audio pings + micro-scrolls
+ *      - 🔒 NEW: Wake Lock API integration - Prevents screen sleep on modern browsers
+ *      - 💓 NEW: Heartbeat mechanism - DOM touches keep JS engine active
+ *      - 🎯 Best for stubborn browsers that throttle background tabs heavily
+ *      - Recommendation: Use "Ping + Scroll Nudge" mode for best results
+ * v4.9 - Added mobile.twitter.com and mobile.x.com support
+ *      - Expanded domain matching to all x.com/twitter.com paths
+ *      - Added update/download URLs for automatic updates
+ *      - Enhanced documentation with installation & donation info
+ * v4.8 - Advanced human-like randomizer with dynamic attention drift
+ *      - Animated UI feedback (breathing status, chip bursts)
+ *      - Improved background tab keep-alive mechanisms
+ * [Earlier versions - see GitHub for full changelog]
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  */
-(function() {
+
+(function () {
     'use strict';
 
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // 💾 SESSION PERSISTENCE CONFIGURATION (v5.2)
-    // ═══════════════════════════════════════════════════════════════════════════════
-    const SESSION_STORAGE_KEY = 'autofeed_session_v5.2';
-    const SESSION_SAVE_INTERVAL = 5000; // Save state every 5 seconds
-    let sessionSaveTimer = null;
-
-    // Session state object
-    let sessionState = {
-        isActive: false,
-        scrollPosition: 0,
-        processedTweetIds: [],
-        stats: {
-            scrolls: 0,
-            tweetsViewed: 0,
-            actionsPerformed: 0,
-            likes: 0,
-            retweets: 0,
-            bookmarks: 0
-        },
-        lastSaved: Date.now(),
-        version: '5.2'
-    };
-
-    /**
-     * 📦 INSTALLATION
-     * ───────────────────────────────────────────────────────────────────────────────
-     * 1. Install a userscript manager extension:
-     *    • Tampermonkey (Chrome, Firefox, Safari, Edge) - Recommended
-     *    • Violentmonkey (Firefox, Chrome)
-     *    • Greasemonkey (Firefox)
-     *
-     * 2. Click the installation link or manually create a new script:
-     *    a. Open your userscript manager dashboard
-     *    b. Create a new script
-     *    c. Copy/paste the entire script content
-     *    d. Save and enable
-     *
-     * 3. Navigate to X.com (or Twitter.com) — the control panel will appear
-    *
-    *
-    * 🔄 UPDATES
-    * ───────────────────────────────────────────────────────────────────────────────
-    * Automatic updates are enabled via @updateURL. Your userscript manager will
-    * check for new versions periodically. You can also manually check:
-    *    https://github.com/Esrevorter/AutoFeed
-    *
-    *
-    * 🎮 USAGE
-    * ───────────────────────────────────────────────────────────────────────────────
-    * 1. Navigate to your desired feed:
-    *    • Home Feed: https://x.com/home
-    *    • Lists: https://x.com/i/lists/[LIST_ID]
-    *    • Profile Lists: https://x.com/[USERNAME]/lists
-    *
-    * 2. Configure your preferences in the floating panel:
-    *    • Actions Fold: Select Like, Retweet, Bookmark; toggle random combos
-    *    • Session Volume: Set min/max tweet range for randomized targets
-    *    • Direction: Choose scroll direction based on feed type
-    *    • Background Tab: Enable silent/audible keep-alive for background use
-    *    • Delays: Set min/max delay between actions (milliseconds)
-    *
-    * 3. Press START to begin automation
-    *    • Panel shows real-time progress and action counters
-    *    • Log displays timestamped activity
-    *    • Animated chips pulse on each successful action
-    *
-    * 4. PAUSE anytime; RESUME after addressing warnings (rate limits, etc.)
-    *
-    * 5. When finished (target reached or end of feed), press RESTART for new session
-    *
-    *
-    * ⚙️ CONFIGURATION OPTIONS
-    * ───────────────────────────────────────────────────────────────────────────────
-    * Actions Fold:
-    *   ❤️ Likes           - Automatically like tweets
-    *   🔁 Retweets        - Automatically retweet (with confirmation click)
-    *   🔖 Bookmarks       - Automatically bookmark tweets
-    *   🎲 Random Combo    - Perform random subset of enabled actions per tweet
-    *   🔀 Randomizer      - Shuffle tweet order + dynamic attention drift
-    *
-    * Session Volume:
-    *   Min Tweets         - Lower bound for random session target (default: 50)
-    *   Max Tweets         - Upper bound for random session target (default: 200)
-    *   → Each session rolls a random target within this range
-    *
-    * Scroll Direction:
-    *   ⬇️ Top→Down        - Start from newest tweets (ideal for Feeds/Lists)
-    *   ⬆️ Bottom→Up       - Start from oldest visible tweets (For-You/backlog)
-    *
-    * Background Tab (ENHANCED in v5.1):
-    *   🔇 Silent Keep-Alive  - Uses inaudible audio to prevent timer throttling
-    *   🔊 Audible Ping       - Faint blips every 6 seconds when tab is hidden
-    *   ⚡ Ping + Scroll Nudge - Aggressive mode with multiple improvements:
-    *                          • Fresh AudioContext per ping (avoids suspension)
-    *                          • Larger scroll nudge (150px vs 50px)
-    *                          • CSS transform trigger (force GPU composite)
-    *                          • Recursive setTimeout (defeats interval throttling)
-    *                          • Faster 1.5s interval (compensates for delays)
-    *   🔒 Wake Lock API      - Automatically requests wake lock to prevent screen sleep
-    *   💓 Enhanced Heartbeat - Multi-strategy approach:
-    *                          • Status element text toggle
-    *                          • Document title flash (forces renderer update)
-    *                          • Performance timeline marks
-    *                          • Body classList toggles (triggers style recalc)
-    *                          • Faster 800ms heartbeat interval
-    *   🎯 Transition Pings   - Extra audio ping when tab transitions to background
-    *                          (ensures IO pipeline stays active during critical moment)
-    *
-    * Delays:
-    *   Min Delay (ms)     - Minimum wait between actions (default: 4000ms)
-    *   Max Delay (ms)     - Maximum wait between actions (default: 9000ms)
-    *   → Actual delay is randomized within this range for human-like behavior
-    *
-    *
-    * 🛡️ SAFETY & BEST PRACTICES
-    * ───────────────────────────────────────────────────────────────────────────────
-    * • Use conservative delays (4000–9000ms recommended)
-    * • Set reasonable session volumes (50–200 tweets)
-    * • Take breaks between sessions to avoid rate limits
-    * • Disable privacy/ad-blockers for x.com if actions fail
-    * • Monitor the log for warnings; pause immediately if flagged
-    * • This script does NOT bypass CAPTCHAs or login walls
-    *
-    *
-    * 🐛 TROUBLESHOOTING
-    * ───────────────────────────────────────────────────────────────────────────────
-    * ⚠️ Rate Limit Detected:
-    *    → Wait 15+ minutes before resuming. Reduce volume/delays next session.
-    *
-    * 🛑 Actions Not Registering:
-    *    → Disable privacy/ad-blockers for x.com
-    *    → Check browser console for errors
-    *    → Refresh page and restart script
-    *
-    * 🧩 Privacy Blocker Warning:
-    *    → X detected extensions breaking page functionality
-    *    → Whitelist x.com in your blocker settings
-    *
-    * 📜 No New Tweets / End of Feed:
-    *    → Script auto-detects when feed is exhausted
-    *    → Press Restart to begin fresh session
-    *
-    * 🎭 Panel Not Appearing:
-    *    → Ensure userscript manager is enabled
-    *    → Check browser console for script errors
-    *    → Verify you're on a supported domain (x.com, twitter.com, mobile variants)
-    *
-    * 😴 "IO Asleep" Messages in Background:
-    *    → FIXED in v5.1! Now uses multiple strategies simultaneously:
-    *      • Fresh AudioContext creation per ping (prevents suspension)
-    *      • Recursive setTimeout instead of setInterval (defeats throttling)
-    *      • Multi-strategy heartbeat (title, performance marks, classList)
-    *      • Transition pings when tab goes background
-    *    → If still occurring, try:
-    *      • Using "Ping + Scroll Nudge" mode (most aggressive)
-    *      • Keeping tab in a separate window (not minimized)
-    *      • Disabling browser power-saving features
-    *      • Using a dedicated browser profile for automation
-    *
-    *
-    * 💖 SUPPORT THE DEVELOPER
-    * ───────────────────────────────────────────────────────────────────────────────
-    * If you find this script useful, consider supporting its continued development!
-    *
-    * ☕ Buy Me a Coffee:
-    *    https://buymeacoffee.com/esrevorter
-    *
-    * ₿ Bitcoin (BTC):
-    *    bc1qwd330n3m9exjfhmzs6r0fh4e73v0plmjv7pawppgv7k79j5ce4gqc6c7u2
-    *
-    * 🐙 GitHub:
-    *    https://github.com/Esrevorter/AutoFeed
-    *
-    * 📬 Report Issues:
-    *    https://github.com/Esrevorter/AutoFeed/issues
-    *
-    *
-    * 📜 LICENSE
-    * ───────────────────────────────────────────────────────────────────────────────
-    * See LICENSE file in the repository.
-    *
-    *
-    * 🏷️ VERSION HISTORY
-    * ───────────────────────────────────────────────────────────────────────────────
-    * v5.1 - CRITICAL BACKGROUND TAB FIXES (addresses persistent "IO asleep" issue)
-    *      - 🔧 FIXED: AudioContext now created fresh per ping (prevents browser suspension)
-    *      - 🔧 FIXED: Recursive setTimeout replaces setInterval (defeats timer throttling)
-    *      - 🔧 FIXED: Enhanced scroll nudge (150px + CSS transform + GPU composite trigger)
-    *      - 🔧 FIXED: Multi-strategy heartbeat (title flash, performance marks, classList)
-    *      - 🔧 FIXED: Transition pings when tab goes background (critical moment protection)
-    *      - 🔧 FIXED: Faster intervals (1.5s ping, 800ms heartbeat) compensate for delays
-    *      - 📝 These changes address Chrome/Firefox aggressive background tab throttling
-    * v5.0 - ENHANCED BACKGROUND TAB SUPPORT (addresses "IO asleep" issue)
-    *      - ⚡ NEW: Ping + Scroll Nudge mode - Aggressive 2s audio pings + micro-scrolls
-    *      - 🔒 NEW: Wake Lock API integration - Prevents screen sleep on modern browsers
-    *      - 💓 NEW: Heartbeat mechanism - DOM touches keep JS engine active
-    *      - 🎯 Best for stubborn browsers that throttle background tabs heavily
-    *      - Recommendation: Use "Ping + Scroll Nudge" mode for best results
-    * v5.2 - 💾 SESSION PERSISTENCE (survives page refreshes!)
-    *      - Auto-saves session state every 5 seconds during active sessions
-    *      - Recovers scroll position, processed tweets, and statistics after reload
-    *      - Graceful cleanup on restart/finish/navigation
-    *      - Version-locked sessions prevent compatibility issues
-    *      - Sessions auto-expire after 30 minutes of inactivity
-    * v4.9 - Added mobile.twitter.com and mobile.x.com support
-    *      - Expanded domain matching to all x.com/twitter.com paths
-    *      - Added update/download URLs for automatic updates
-    *      - Enhanced documentation with installation & donation info
-    * v4.8 - Advanced human-like randomizer with dynamic attention drift
-    *      - Animated UI feedback (breathing status, chip bursts)
-    *      - Improved background tab keep-alive mechanisms
-    * [Earlier versions - see GitHub for full changelog]
-    *
-     * ═══════════════════════════════════════════════════════════════════════════════
-     */
-
-    // Now start the actual script code
     const $ = (id) => document.getElementById(id);
     const SETTINGS_KEY = 'xAutoFeedSettingsV4';
     const POS_KEY = 'xAutoFeedPanelPosV4';
@@ -375,174 +254,6 @@
         wakeLock: null, heartbeatInterval: null,
         focusLevel: 0.5,
     };
-
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // 💾 SESSION PERSISTENCE FUNCTIONS (v5.2)
-    // ═══════════════════════════════════════════════════════════════════════════════
-    
-    /**
-     * Save current session state to persistent storage
-     */
-    function saveSessionState() {
-        if (!state.isRunning && !sessionState.isActive) return;
-        
-        // Update session state from current runtime state
-        sessionState.isActive = state.isRunning && !state.isPaused;
-        sessionState.scrollPosition = window.scrollY;
-        sessionState.processedTweetIds = Array.from(state.processedIds);
-        sessionState.stats = {
-            scrolls: state.actionCount,
-            tweetsViewed: state.processedIds.size,
-            actionsPerformed: state.likeCount + state.rtCount + state.bmCount,
-            likes: state.likeCount,
-            retweets: state.rtCount,
-            bookmarks: state.bmCount
-        };
-        sessionState.lastSaved = Date.now();
-        sessionState.settings = {
-            enableLike: state.enableLike,
-            enableRetweet: state.enableRetweet,
-            enableBookmark: state.enableBookmark,
-            randomizeActions: state.randomizeActions,
-            randomizeOrder: state.randomizeOrder,
-            keepAliveSilent: state.keepAliveSilent,
-            keepAliveAudible: state.keepAliveAudible,
-            keepAlivePing: state.keepAlivePing,
-            direction: state.direction,
-            minDelay: state.minDelay,
-            maxDelay: state.maxDelay,
-            volMin: state.volMin,
-            volMax: state.volMax
-        };
-        
-        try {
-            GM_setValue(SESSION_STORAGE_KEY, JSON.stringify(sessionState));
-            console.log(`[💾 ${new Date().toLocaleTimeString()}] Session saved (Scroll: ${sessionState.scrollPosition}, Tweets: ${sessionState.processedTweetIds.length})`);
-        } catch (e) {
-            console.error('[❌ Session Save Error]', e);
-        }
-    }
-    
-    /**
-     * Load and restore session state from persistent storage
-     * @returns {boolean} True if a valid session was restored
-     */
-    function loadSessionState() {
-        try {
-            const saved = GM_getValue(SESSION_STORAGE_KEY);
-            if (!saved) return false;
-            
-            const parsed = JSON.parse(saved);
-            
-            // Validate version compatibility
-            if (!parsed.version || parsed.version !== '5.2') {
-                console.log('[⚠️ Session Version Mismatch] Clearing old session data');
-                GM_deleteValue(SESSION_STORAGE_KEY);
-                return false;
-            }
-            
-            // Check if session is recent (within 30 minutes)
-            const age = Date.now() - parsed.lastSaved;
-            if (age > 30 * 60 * 1000) {
-                console.log('[⏰ Session Expired] Session too old to restore');
-                GM_deleteValue(SESSION_STORAGE_KEY);
-                return false;
-            }
-            
-            // Restore settings
-            if (parsed.settings) {
-                state.enableLike = parsed.settings.enableLike;
-                state.enableRetweet = parsed.settings.enableRetweet;
-                state.enableBookmark = parsed.settings.enableBookmark;
-                state.randomizeActions = parsed.settings.randomizeActions;
-                state.randomizeOrder = parsed.settings.randomizeOrder;
-                state.keepAliveSilent = parsed.settings.keepAliveSilent;
-                state.keepAliveAudible = parsed.settings.keepAliveAudible;
-                state.keepAlivePing = parsed.settings.keepAlivePing;
-                state.direction = parsed.settings.direction;
-                state.minDelay = parsed.settings.minDelay;
-                state.maxDelay = parsed.settings.maxDelay;
-                state.volMin = parsed.settings.volMin;
-                state.volMax = parsed.settings.volMax;
-            }
-            
-            // Restore processed IDs
-            if (parsed.processedTweetIds && Array.isArray(parsed.processedTweetIds)) {
-                state.processedIds = new Set(parsed.processedTweetIds);
-            }
-            
-            // Restore counters
-            if (parsed.stats) {
-                state.actionCount = parsed.stats.scrolls || 0;
-                state.likeCount = parsed.stats.likes || 0;
-                state.rtCount = parsed.stats.retweets || 0;
-                state.bmCount = parsed.stats.bookmarks || 0;
-            }
-            
-            sessionState = parsed;
-            
-            console.log(`[✅ ${new Date().toLocaleTimeString()}] Session restored! (Scroll: ${sessionState.scrollPosition}, Tweets: ${state.processedIds.size}, Actions: ${state.likeCount + state.rtCount + state.bmCount})`);
-            return true;
-            
-        } catch (e) {
-            console.error('[❌ Session Load Error]', e);
-            GM_deleteValue(SESSION_STORAGE_KEY);
-            return false;
-        }
-    }
-    
-    /**
-     * Start automatic session saving timer
-     */
-    function startSessionSaveTimer() {
-        stopSessionSaveTimer();
-        sessionSaveTimer = setInterval(() => {
-            if (state.isRunning && !state.isPaused) {
-                saveSessionState();
-            }
-        }, SESSION_SAVE_INTERVAL);
-    }
-    
-    /**
-     * Stop automatic session saving timer
-     */
-    function stopSessionSaveTimer() {
-        if (sessionSaveTimer) {
-            clearInterval(sessionSaveTimer);
-            sessionSaveTimer = null;
-        }
-    }
-    
-    /**
-     * Handle page refresh/reload detection and session recovery
-     */
-    function handlePageRefresh() {
-        // Save state before potential unload
-        saveSessionState();
-    }
-    
-    /**
-     * Attempt to resume a previous session after page load
-     */
-    function attemptSessionRecovery() {
-        const restored = loadSessionState();
-        if (restored && sessionState.isActive) {
-            console.log('[🔄 Auto-Resume] Previous session detected. Waiting for user to press START...');
-            // Update UI to show recovered state
-            setTimeout(() => {
-                updateUIState('READY');
-                if ($('log')) {
-                    $('log').innerHTML += `<div style="color:#4ade80">[💾 ${new Date().toLocaleTimeString()}] ✅ Session recovered: ${state.processedIds.size} tweets, ${state.likeCount + state.rtCount + state.bmCount} actions</div>`;
-                    $('log').scrollTop = $('log').scrollHeight;
-                }
-            }, 500);
-            return true;
-        }
-        return false;
-    }
-    
-    // Register unload handler to save state on page refresh/navigation
-    window.addEventListener('beforeunload', handlePageRefresh);
 
     function loadSettings() {
         try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
@@ -1007,25 +718,16 @@
                 $('x-percent').innerText = '0%';
                 $('btn-start').innerText = 'Start';
                 
-                // Clear saved session on manual restart
-                GM_deleteValue(SESSION_STORAGE_KEY);
-                
                 // Clean up any existing keep-alive mechanisms
                 releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
-                stopSessionSaveTimer();
             }
 
-            // Roll a fresh random session target (or use restored session's target)
-            if (!sessionState.isActive || !sessionState.stats) {
-                state.maxActions = rollSessionTarget();
-            } else {
-                // Restored session keeps its original target
-                console.log('[📋 Session Target] Using restored session target');
-            }
+            // Roll a fresh random session target
+            state.maxActions = rollSessionTarget();
             $('x-max').innerText = state.maxActions;
-            $('x-count').innerText = state.actionCount.toString();
-            $('x-progress').style.width = ((state.actionCount / state.maxActions) * 100) + '%';
-            $('x-percent').innerText = Math.round((state.actionCount / state.maxActions) * 100) + '%';
+            $('x-count').innerText = '0';
+            $('x-progress').style.width = '0%';
+            $('x-percent').innerText = '0%';
 
             // Show the rolled target in the Session fold
             const rolledEl = $('x-vol-rolled');
@@ -1038,9 +740,6 @@
             state.focusLevel = 0.5 + (Math.random() * 0.4);
             ensureAudio();
             state.isRunning = true; state.isPaused = false;
-            
-            // Start auto-save timer for session persistence
-            startSessionSaveTimer();
 
             if (state.direction === 'down') goTop(); else goBottom();
 
@@ -1069,22 +768,7 @@
             if (!state.isRunning) return;
             if (document.hidden) {
                 addLog('👁️ Tab hidden → background mode (keep-alive active)');
-                // Force immediate re-initialization of audio contexts when going to background
                 refreshKeepAlive();
-                // Extra wake-up ping to ensure IO stays alive during transition
-                setTimeout(() => {
-                    if (state.keepAlivePing && document.hidden) {
-                        try {
-                            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                            const o = ctx.createOscillator(), g = ctx.createGain();
-                            o.frequency.value = 800;
-                            g.gain.value = 0.01;
-                            o.connect(g); g.connect(ctx.destination);
-                            o.start(); o.stop(ctx.currentTime + 0.05);
-                            setTimeout(() => ctx.close(), 100);
-                        } catch(e) {}
-                    }
-                }, 500);
             } else {
                 addLog('👁️ Tab visible → nudging loader in current direction');
                 stepReveal();
@@ -1173,8 +857,6 @@
             state.isRunning = false; 
             refreshKeepAlive();
             releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
-            stopSessionSaveTimer();
-            saveSessionState(); // Final save before stopping
         } else if (status === 'FINISHED') {
             statusEl.innerText = 'Finished'; statusEl.classList.add('x-status-finished');
             btnStart.classList.remove('x-hide'); btnStart.innerText = 'Restart';
@@ -1182,8 +864,6 @@
             state.isRunning = false; 
             refreshKeepAlive();
             releaseWakeLock(); stopSilent(); stopAudible(); stopPingNudge(); stopHeartbeat();
-            stopSessionSaveTimer();
-            saveSessionState(); // Final save before stopping
             addLog('✅ Finished! ' + state.actionCount + ' tweets processed (target was ' + state.maxActions + ').');
         }
     }
@@ -1337,50 +1017,34 @@
     // NEW: Aggressive ping + scroll nudge mode for stubborn browsers
     function startPingNudge() {
         if (state.pingTimer) return;
+        const ctx = ensureAudio(); if (!ctx) return;
         
         const pingAndNudge = () => {
             if (!document.hidden || !state.isRunning || state.isPaused) return;
             
-            // Re-create audio context each time to avoid suspension issues
+            // Play a quick ping
             try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const o = ctx.createOscillator(), g = ctx.createGain();
                 o.type = 'square'; o.frequency.value = 1200;
                 g.gain.setValueAtTime(0.0001, ctx.currentTime);
                 g.gain.exponentialRampToValueAtTime(0.02, ctx.currentTime + 0.01);
                 g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.03);
                 o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.04);
-                // Close context immediately to prevent suspension
-                setTimeout(() => ctx.close(), 100);
             } catch (e) {}
             
-            // Perform a MORE aggressive micro-scroll to trigger render pipeline
+            // Perform a micro-scroll to trigger render pipeline
             try {
-                const scrollStep = state.direction === 'down' ? 150 : -150;
+                const scrollStep = state.direction === 'down' ? 50 : -50;
                 window.scrollBy({ top: scrollStep, behavior: 'auto' });
-                setTimeout(() => window.scrollBy({ top: -scrollStep, behavior: 'auto' }), 150);
-                // Also touch the document body to force layout recalculation
-                document.body.style.transform = 'translateZ(0)';
-                setTimeout(() => document.body.style.transform = '', 100);
+                setTimeout(() => window.scrollBy({ top: -scrollStep, behavior: 'auto' }), 100);
             } catch (e) {}
         };
         
         pingAndNudge();
-        // Use nested setTimeout instead of setInterval to avoid browser throttling
-        const schedulePing = () => {
-            if (!state.isRunning || state.isPaused) return;
-            state.pingTimer = setTimeout(() => {
-                pingAndNudge();
-                schedulePing();
-            }, 1500); // Slightly faster to compensate for potential delays
-        };
-        schedulePing();
+        state.pingTimer = setInterval(pingAndNudge, 2000);
     }
     function stopPingNudge() { 
-        if (state.pingTimer) { 
-            clearTimeout(state.pingTimer); 
-            state.pingTimer = null; 
-        } 
+        if (state.pingTimer) { clearInterval(state.pingTimer); state.pingTimer = null; } 
     }
     
     // NEW: Wake Lock API for modern browsers
@@ -1405,41 +1069,17 @@
         }
     }
     
-    // NEW: Heartbeat to keep JS engine active - ENHANCED with multiple DOM touches
+    // NEW: Heartbeat to keep JS engine active
     function startHeartbeat() {
         if (state.heartbeatInterval) return;
-        
-        // Multiple strategies to keep the browser engaged
         state.heartbeatInterval = setInterval(() => {
             if (!state.isRunning || state.isPaused) return;
-            
+            // Touch the DOM to keep renderer engaged
             try {
-                // Strategy 1: Touch the status element
                 const status = $('x-status');
-                if (status) { 
-                    const t = status.innerText; 
-                    status.innerText = t + ' '; 
-                    setTimeout(() => status.innerText = t.trim(), 50);
-                }
-                
-                // Strategy 2: Touch document title (forces renderer update)
-                if (document.hidden) {
-                    const originalTitle = document.title;
-                    document.title = originalTitle + ' •';
-                    setTimeout(() => document.title = originalTitle, 50);
-                }
-                
-                // Strategy 3: Performance mark (keeps performance timeline active)
-                if (window.performance && window.performance.mark) {
-                    try { window.performance.mark('xf-heartbeat-' + Date.now()); } catch(e) {}
-                }
-                
-                // Strategy 4: Touch body classList (triggers style recalc)
-                document.body.classList.toggle('xf-hb');
-                setTimeout(() => document.body.classList.toggle('xf-hb'), 50);
-                
+                if (status) { const t = status.innerText; status.innerText = t; }
             } catch (e) {}
-        }, 800); // Faster heartbeat for stubborn browsers
+        }, 1000);
     }
     function stopHeartbeat() {
         if (state.heartbeatInterval) { clearInterval(state.heartbeatInterval); state.heartbeatInterval = null; }
@@ -1648,11 +1288,7 @@
         if (document.querySelector('[data-testid="primaryColumn"]')) {
             initObserver.disconnect();
             createUI();
-            
-            // Attempt to recover previous session
-            attemptSessionRecovery();
-            
-            console.log('%c⚡ Auto-Feed v5.2 loaded — Session Persistence + Critical BG Tab Fixes + Enhanced Heartbeat', 'color:#1d9bf0;font-weight:bold;');
+            console.log('%c⚡ Auto-Feed v4.9 loaded — Randomised Volume + Dynamic Drift + Animated UI', 'color:#1d9bf0;font-weight:bold;');
         }
     });
     initObserver.observe(document.body, { childList: true, subtree: true });
