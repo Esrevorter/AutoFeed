@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         X.com Auto-Feed
 // @namespace    http://tampermonkey.net/
-// @version      4.9
-// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive, virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), and ANIMATED UI feedback. (CSP-Proof)
+// @version      5.0
+// @description  Safely likes/retweets/bookmarks tweets in Feeds/Lists with VERIFIED actions, RANDOMISED session volume, consecutive-failure throttle detection, DIRECTION-AWARE progressive scrolling, FOLDED config + PINNED console/controls, background-tab keep-alive, virtualisation-proof dedupe, end-of-feed + privacy-blocker detection, FLOATING/draggable UI, ADVANCED HUMAN-LIKE RANDOMIZER (dynamic attention drift), ANIMATED UI feedback, PERSISTENT SESSIONS for crash recovery. (CSP-Proof)
 // @author       Esrevorter
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -18,7 +18,7 @@
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * ⚡ X.COM AUTO-FEED v4.9
+ * ⚡ X.COM AUTO-FEED v5.0
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  * 📖 DESCRIPTION
@@ -50,6 +50,9 @@
  * • ANIMATED UI FEEDBACK - Smooth animations, breathing status indicators, and
  *                          action chip bursts provide visual confirmation
  * • CSP-PROOF            - Works even with strict Content Security Policies
+ * • PERSISTENT SESSIONS  - Survives browser crashes, page reloads, and server
+ *   (CRASH RECOVERY)       refreshes by saving progress to localStorage every
+ *                          5 actions and offering resume on restart
  *
  *
  * 📦 INSTALLATION
@@ -100,6 +103,9 @@
  * 4. PAUSE anytime; RESUME after addressing warnings (rate limits, etc.)
  *
  * 5. When finished (target reached or end of feed), press RESTART for new session
+ *
+ * 6. CRASH RECOVERY: If the browser crashes or page refreshes mid-session,
+ *    clicking START again will offer to resume your interrupted session
  *
  *
  * ⚙️ CONFIGURATION OPTIONS
@@ -188,6 +194,11 @@
  *
  * 🏷️ VERSION HISTORY
  * ───────────────────────────────────────────────────────────────────────────────
+ * v5.0 - PERSISTENT SESSIONS for crash/survival recovery
+ *      - Auto-saves progress every 5 actions to localStorage
+ *      - Offers session resume on page reload/crash
+ *      - Session ID tracking with stale session cleanup (24h)
+ *      - Updated documentation with crash recovery usage
  * v4.9 - Added mobile.twitter.com and mobile.x.com support
  *      - Expanded domain matching to all x.com/twitter.com paths
  *      - Added update/download URLs for automatic updates
@@ -204,8 +215,9 @@
     'use strict';
 
     const $ = (id) => document.getElementById(id);
-    const SETTINGS_KEY = 'xAutoFeedSettingsV4';
-    const POS_KEY = 'xAutoFeedPanelPosV4';
+    const SETTINGS_KEY = 'xAutoFeedSettingsV5';
+    const POS_KEY = 'xAutoFeedPanelPosV5';
+    const SESSION_KEY = 'xAutoFeedSessionV5';
 
     // Safe bounds for the session volume range
     const VOL_ABS_MIN = 20;
@@ -238,6 +250,9 @@
         consecutiveFailures: 0,
         audioCtx: null, silentNode: null, silentGain: null, audibleTimer: null,
         focusLevel: 0.5,
+        sessionId: null,
+        sessionStartTime: null,
+        lastActionTime: null,
     };
 
     function loadSettings() {
@@ -266,6 +281,77 @@
     }
 
     function clampVol(v) { return Math.max(VOL_ABS_MIN, Math.min(VOL_ABS_MAX, v)); }
+
+    // --- PERSISTENCE: Save/Restore Session for Crash Recovery ---
+    function saveSession() {
+        try {
+            const sessionData = {
+                sessionId: state.sessionId,
+                actionCount: state.actionCount,
+                maxActions: state.maxActions,
+                likeCount: state.likeCount,
+                rtCount: state.rtCount,
+                bmCount: state.bmCount,
+                processedIds: Array.from(state.processedIds),
+                sessionStartTime: state.sessionStartTime,
+                lastActionTime: state.lastActionTime,
+                isRunning: state.isRunning,
+                isPaused: state.isPaused,
+            };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+        } catch (e) {}
+    }
+
+    function loadSession() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+            if (!saved || !saved.sessionId) return null;
+            
+            // Check if session is stale (older than 24 hours)
+            const now = Date.now();
+            if (saved.lastActionTime && (now - saved.lastActionTime) > 24 * 60 * 60 * 1000) {
+                clearSession();
+                return null;
+            }
+            
+            return saved;
+        } catch (e) { return null; }
+    }
+
+    function clearSession() {
+        try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+    }
+
+    function restoreSession() {
+        const saved = loadSession();
+        if (!saved) return false;
+        
+        state.sessionId = saved.sessionId;
+        state.actionCount = saved.actionCount || 0;
+        state.maxActions = saved.maxActions || 100;
+        state.likeCount = saved.likeCount || 0;
+        state.rtCount = saved.rtCount || 0;
+        state.bmCount = saved.bmCount || 0;
+        state.processedIds = new Set(saved.processedIds || []);
+        state.sessionStartTime = saved.sessionStartTime;
+        state.lastActionTime = saved.lastActionTime;
+        state.isRunning = saved.isRunning || false;
+        state.isPaused = saved.isPaused || false;
+        
+        // Mark DOM elements as processed
+        saved.processedIds?.forEach(id => {
+            const tweet = document.querySelector(`[data-tweet-id="${id}"]`);
+            if (tweet) tweet.setAttribute('data-processed', 'true');
+        });
+        
+        addLog(`🔄 Recovered session ${saved.sessionId.slice(0, 8)}... (${state.actionCount}/${state.maxActions} actions)`);
+        return true;
+    }
+
+    // Roll a fresh session ID
+    function generateSessionId() {
+        return 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    }
 
     // Roll a random session target within the configured range
     function rollSessionTarget() {
@@ -684,6 +770,27 @@
                 alert('Please enable at least one action (Like, Retweet, or Bookmark).'); return;
             }
 
+            // Check for existing session to restore
+            const existingSession = loadSession();
+            if (existingSession && $('btn-start').innerText !== 'Restart') {
+                const confirmed = confirm(`🔄 Found interrupted session "${existingSession.sessionId.slice(0, 12)}..." with ${existingSession.actionCount}/${existingSession.maxActions} actions.\n\nWould you like to RESUME this session?\n\nClick OK to Resume, Cancel to start fresh.`);
+                if (confirmed) {
+                    restoreSession();
+                    state.isRunning = true;
+                    state.isPaused = false;
+                    updateUIState('RUNNING');
+                    refreshKeepAlive();
+                    addLog('▶️ Resumed session — ' + getEnabledActionsLabel() +
+                           ' | ' + (state.direction === 'down' ? '⬇️ top→down' : '⬆️ bottom→up') +
+                           (state.randomizeOrder ? ' | 🔀 Drift' : '') +
+                           ' | 🎯 target: ' + state.maxActions);
+                    mainLoop();
+                    return;
+                } else {
+                    clearSession();
+                }
+            }
+
             if ($('btn-start').innerText === 'Restart') {
                 state.actionCount = 0; state.likeCount = 0; state.rtCount = 0; state.bmCount = 0;
                 state.processedIds.clear();
@@ -693,9 +800,13 @@
                 $('x-progress').style.width = '0%';
                 $('x-percent').innerText = '0%';
                 $('btn-start').innerText = 'Start';
+                clearSession();
             }
 
-            // Roll a fresh random session target
+            // Generate new session ID and roll a fresh random session target
+            state.sessionId = generateSessionId();
+            state.sessionStartTime = Date.now();
+            state.lastActionTime = Date.now();
             state.maxActions = rollSessionTarget();
             $('x-max').innerText = state.maxActions;
             $('x-count').innerText = '0';
@@ -723,17 +834,18 @@
                    ' | ' + (state.direction === 'down' ? '⬇️ top→down' : '⬆️ bottom→up') +
                    (state.randomizeOrder ? ' | 🔀 Drift' : '') +
                    ' | 🎯 target: ' + state.maxActions);
+            saveSession(); // Persist session start
             mainLoop();
         });
 
         $('btn-pause').addEventListener('click', () => {
-            state.isPaused = true; updateUIState('PAUSED'); refreshKeepAlive(); addLog('⏸️ Paused');
+            state.isPaused = true; saveSession(); updateUIState('PAUSED'); refreshKeepAlive(); addLog('⏸️ Paused');
         });
         $('btn-resume').addEventListener('click', () => {
             state.isPaused = false; state.consecutiveFailures = 0;
             $('x-warning').classList.add('x-hide');
             ensureAudio(); updateUIState('RUNNING'); refreshKeepAlive();
-            addLog('▶️ Resumed'); mainLoop();
+            addLog('▶️ Resumed'); saveSession(); mainLoop();
         });
 
         document.addEventListener('visibilitychange', () => {
@@ -1148,13 +1260,18 @@
                     state.consecutiveFailures = 0;
                     state.processedIds.add(id);
                     tweet.setAttribute('data-processed', 'true');
-                    state.actionCount++; updateUIState('RUNNING'); updateActionChips();
+                    state.actionCount++; 
+                    state.lastActionTime = Date.now();
+                    updateUIState('RUNNING'); updateActionChips();
                     addLog('🎲 ' + performed.join('+') + ' → tweet #' + state.actionCount);
+                    // Persist after each successful action for crash recovery
+                    if (state.actionCount % 5 === 0) saveSession();
                 } else if (failed > 0) {
                     state.consecutiveFailures++;
                     addLog('⚠️ action did not register (consecutive ' + state.consecutiveFailures + ')');
                     if (state.consecutiveFailures >= 3) {
                         state.isPaused = true; pausedOrDone = true;
+                        saveSession();
                         updateUIState('ACTION_FAIL'); refreshKeepAlive();
                         addLog('🛑 3 actions in a row failed to register — likely a privacy/ad-blocker or soft throttle.');
                         break;
@@ -1173,6 +1290,11 @@
                 await sleep(1000, 1600);
             }
         }
+        
+        // Final save when loop exits
+        if (state.actionCount >= state.maxActions || !state.isRunning) {
+            clearSession();
+        }
     }
 
     // --- INIT ---
@@ -1180,7 +1302,14 @@
         if (document.querySelector('[data-testid="primaryColumn"]')) {
             initObserver.disconnect();
             createUI();
-            console.log('%c⚡ Auto-Feed v4.9 loaded — Randomised Volume + Dynamic Drift + Animated UI', 'color:#1d9bf0;font-weight:bold;');
+            // Check for interrupted session on load
+            setTimeout(() => {
+                const saved = loadSession();
+                if (saved && saved.isRunning && !saved.isPaused) {
+                    addLog(`⚠️ Previous session "${saved.sessionId.slice(0, 12)}..." was interrupted. Click Start to resume.`);
+                }
+            }, 500);
+            console.log('%c⚡ Auto-Feed v5.0 loaded — Persistent Sessions + Humanized Actions + Crash Recovery', 'color:#1d9bf0;font-weight:bold;');
         }
     });
     initObserver.observe(document.body, { childList: true, subtree: true });
